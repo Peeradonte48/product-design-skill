@@ -1,16 +1,16 @@
 ---
-name: business-review
+name: biz-review
 description: >-
   Challenge a plan, spec, UCN, or feature idea from the business/founder perspective —
   premise, demand, wedge, scope — before anything gets built (doc → scope decisions).
-  Use this skill WHENEVER the user wants a business-angle review of what they're about
-  to build. Triggers: "review this plan as a CEO", "is this worth building", "challenge
-  the scope of this spec", "business review of this feature", "should we build this".
-  It judges value and scope; it does not resolve plan ambiguity (that's grill-me) and
-  it does not review code or pixels.
+  Invoke explicitly with /biz-review <path-or-idea> for a business-angle review of what
+  is about to be built. It judges value and scope; it does not resolve plan ambiguity
+  (that's /harden-doc) and it does not review code or pixels.
+disable-model-invocation: true
+argument-hint: <doc path or feature idea to challenge>
 ---
 
-# Business Review (premise, demand, wedge, scope)
+# Biz Review (premise, demand, wedge, scope)
 
 Review a plan, spec, UCN, or feature idea the way a rigorous founder/CEO would: challenge
 the premise, demand evidence over interest, find the narrowest wedge, then put every
@@ -18,11 +18,14 @@ scope change in front of the user as an explicit decision. The output is a set o
 **recorded scope decisions** — what's in, what's explicitly NOT in, what's deferred —
 not encouragement.
 
-This skill is a portable distillation of the business core of gstack's `plan-ceo-review`
-and `office-hours` skills (MIT, © 2026 Garry Tan), rebuilt for this suite with the
-gstack runtime, telemetry, and state machinery removed. It is stack-agnostic and
-document-agnostic: point it at any suite artifact (a product spec from
-`figjam-sitemap-to-spec`, a UCN, a handoff brief) or a plan described in conversation.
+This skill is **command-only**: it runs when the user types `/biz-review`, never from
+natural-language triggering. It is a portable distillation of the business core of
+gstack's `plan-ceo-review` and `office-hours` skills (MIT, © 2026 Garry Tan), rebuilt
+for this suite with the gstack runtime, telemetry, and state machinery removed. It is
+stack-agnostic and document-agnostic: point it at any suite artifact (a product spec
+from `figjam-sitemap-to-spec`, a UCN, a handoff brief) or a plan described in
+conversation. If the command was given an argument (a file path or idea), start there;
+if not, ask what to review.
 
 ## Posture — anti-sycophancy is the contract
 
@@ -131,8 +134,8 @@ over asking a question the evidence already answers.
 ## When NOT to use
 
 - The plan's **decisions are ambiguous or incomplete** and the user wants them resolved
-  one-by-one — that's `grill-me`. Business-review questions the premise; grilling
-  sharpens the plan that survives it. Running grill-me after a business review is a
+  one-by-one — that's `/harden-doc`. Biz-review questions the premise; hardening
+  sharpens the plan that survives it. Running `/harden-doc` after a biz review is a
   natural sequence.
 - The user wants **code, design, or pixel fidelity reviewed** — that's the build skills'
   verification steps, not this.

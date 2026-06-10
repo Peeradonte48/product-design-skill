@@ -23,8 +23,8 @@ SKILLS=(
   "use-case-narrative-to-prototype"
   "figjam-sitemap-to-spec"
   "page-to-figma"
-  "grill-me"
-  "business-review"
+  "harden-doc"
+  "biz-review"
 )
 
 # --- arg parsing -----------------------------------------------------------
@@ -105,4 +105,5 @@ done
 echo
 echo "Done. Restart Claude Code (or run /doctor) so it picks up the new skills."
 echo "Invoke a skill by sharing a Figma/FigJam link, or type its name, e.g.:"
-echo "  implement-figma-design  •  figjam-to-use-case-narrative  •  use-case-narrative-to-prototype  •  figjam-sitemap-to-spec  •  page-to-figma  •  grill-me  •  business-review"
+echo "  implement-figma-design  •  figjam-to-use-case-narrative  •  use-case-narrative-to-prototype  •  figjam-sitemap-to-spec  •  page-to-figma"
+echo "Run the two doc-review skills as commands:  /harden-doc <doc>  •  /biz-review <doc>"

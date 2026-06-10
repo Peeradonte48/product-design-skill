@@ -9,7 +9,7 @@ description: >-
   product spec from this site structure <figjam-link>", "spec out the app from this
   whiteboard sitemap". This reads FROM FigJam only — it does not draw or edit the
   diagram. It produces a markdown spec, not code and not a use-case narrative. The
-  spec is plain markdown you can stress-test with a doc-review skill (e.g. grill-me)
+  spec is plain markdown you can stress-test with a doc-review skill (e.g. /harden-doc)
   and then feed to use-case-narrative-to-prototype or implement-figma-design.
 ---
 
@@ -98,8 +98,9 @@ template. Adapt it to the board:
 Before writing the file, confirm the output directory with the user (a common convention is
 a `docs/specs/` folder, but don't assume it — ask). After writing, report what you grounded
 in the diagram vs. what you had to ask about, and list any thin sections. Note that the spec
-is plain markdown ready to be stress-tested with a doc-review skill (e.g. `grill-me`) or fed
-to `use-case-narrative-to-prototype` / `implement-figma-design`.
+is plain markdown ready to be stress-tested with a doc-review command (e.g. `/harden-doc`,
+or `/biz-review` for the business case) or fed to `use-case-narrative-to-prototype` /
+`implement-figma-design`.
 
 ## Reference files
 

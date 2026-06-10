@@ -1,28 +1,33 @@
 ---
-name: grill-me
+name: harden-doc
 description: >-
-  Interview the user relentlessly about a plan, spec, or design until every branch of
-  the decision tree is resolved and shared understanding is reached (doc → hardened doc).
-  Use this skill WHENEVER the user wants a plan or document stress-tested by questioning,
-  or mentions "grill me." Triggers: "grill me on this plan", "stress-test this spec",
-  "poke holes in this UCN", "interview me about this design before we build it". It
-  resolves ambiguity and missing decisions; it does not judge business value (that's
-  business-review) and it does not build anything.
+  Interview the user relentlessly about a plan, spec, or design doc until every branch
+  of the decision tree is resolved and shared understanding is reached (doc → hardened
+  doc). Invoke explicitly with /harden-doc <path-or-topic> when a plan, product spec,
+  or UCN should be stress-tested by questioning before it gets built. It resolves
+  ambiguity and missing decisions; it does not judge business value (that's /biz-review)
+  and it does not build anything.
+disable-model-invocation: true
+argument-hint: <doc path or plan to grill>
 ---
 
-# Grill Me (resolve every branch of the decision tree)
+# Harden Doc (resolve every branch of the decision tree)
 
 Interview the user relentlessly about every aspect of the plan, spec, or design at hand
 until you reach a **shared understanding** — every branch of the decision tree walked,
 every dependency between decisions resolved one-by-one. The output is not a verdict; it
 is a plan with no unresolved ambiguity left in it.
 
-This skill is a fork of the standalone `grill-me`, adapted for this suite. It pairs
-naturally with the suite's documents: grill a **UCN** before
-`use-case-narrative-to-prototype` builds it, a **product spec** after
+This skill is **command-only**: it runs when the user types `/harden-doc`, never from
+natural-language triggering. It is a fork of the standalone `grill-me` skill, renamed
+and adapted for this suite. It pairs naturally with the suite's documents: harden a
+**UCN** before `use-case-narrative-to-prototype` builds it, a **product spec** after
 `figjam-sitemap-to-spec` writes it, or any plan before implementation. It is the
-generalized form of the **clarify-until-clear** rule every suite skill carries — reach
-for it when the user wants the questioning itself, as a session.
+generalized form of the **clarify-until-clear** rule every suite skill carries — the
+user invokes it when they want the questioning itself, as a session.
+
+If the command was given an argument (a file path or topic), start there; if not, ask
+what document or plan to harden.
 
 ## Method
 
@@ -44,6 +49,6 @@ for it when the user wants the questioning itself, as a session.
 ## When NOT to use
 
 - The user wants the **business case** challenged (is this worth building? right
-  problem? smallest wedge?) — that's `business-review`, this suite's other doc-review
-  skill. Grilling sharpens a plan's decisions; business-review questions its premise.
+  problem? smallest wedge?) — that's `/biz-review`, this suite's other doc-review
+  command. Hardening sharpens a plan's decisions; biz-review questions its premise.
 - The user just wants a question answered or a doc summarized — no session needed.
