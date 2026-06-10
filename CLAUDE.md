@@ -32,9 +32,9 @@ Both `figjam-to-use-case-narrative` and `use-case-narrative-to-prototype` carry 
 - **Honor the target project's own conventions** (token systems, accessibility/ergonomics rules like touch-target or body-font minimums) while matching the design — and surface a conflict rather than silently shipping something that breaks a rule.
 - **Reuse over reinvention; match every breakpoint.** Use existing components/tokens; a match at one width that breaks at another is not a match.
 - **Clarify until clear.** This is the cross-cutting rule in all the skills — a wrong guess that looks right silently corrupts the spec. Batch related questions, but don't proceed past an unresolved ambiguity.
-- **Don't confuse direction.** These skills are design/flow → code (or doc). Pushing code into Figma is a different skill suite (`figma-generate-design`, `figma-generate-library`).
+- **Don't confuse direction.** Most of these skills go design/flow → code (or doc); `page-to-figma` is the one exception, going running-page → Figma. Three directions stay distinct: pushing a *finished Figma design into code* is `implement-figma-design`; pushing *raw code into Figma* with no accuracy supervision is the separate `figma-generate-design` / `figma-generate-library` suite; `page-to-figma` is the supervised running-page → Figma path that orchestrates that suite. Don't reach for one when the user wants another.
 - **Load `figma-use` before any `use_figma` write call.** Pure reads (`get_design_context`, `get_screenshot`, `get_metadata`, `get_variable_defs`, `get_figjam`) generally don't need it.
 
 ## Tooling available
 
-Figma MCP read tools (`get_design_context`, `get_screenshot`, `get_metadata`, `get_variable_defs`, `get_figjam`) and write tool (`use_figma`), the `shadcn` MCP, and browser/screenshot tooling (e.g. Playwright) for screenshot-based verification.
+Figma MCP read tools (`get_design_context`, `get_screenshot`, `get_metadata`, `get_variable_defs`, `get_libraries`, `search_design_system`, `get_figjam`) and write tools (`use_figma`, plus `generate_figma_design` — the running-app capture `page-to-figma` uses to source image hashes), the `shadcn` MCP, and browser/screenshot tooling (e.g. Playwright) for DOM extraction and screenshot-based verification.
