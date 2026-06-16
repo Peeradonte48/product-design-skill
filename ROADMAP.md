@@ -112,7 +112,13 @@ artifact to test and hand off, instead of running two skills that don't compose.
 built as an explicit composition of `implement-figma-design` + `use-case-narrative-to-prototype`
 rather than a from-scratch skill.
 
-### P2 — `critique-figma-design` (self-check, not taste-maker)
+### P2 — `critique-figma-design` (self-check, not taste-maker) — ✅ SHIPPED
+**Status:** shipped. Command-only, read-only Figma self-check. Four measured categories +
+evidence-anchored Nielsen-10 heuristic pass (separate section), severity-first, no quality
+score. Contrast via screenshot-pixel-sampling; conform-to-target thresholds; modality-aware
+touch-targets; evidenced role-signals; token-gated spacing. Decisions in
+`docs/superpowers/specs/2026-06-17-critique-figma-design-design.md`.
+
 **Input → output:** Figma frame (MCP reads only) → **objective checklist report**.
 
 Why: a second pair of eyes for the things that are *checkable*, not subjective —
