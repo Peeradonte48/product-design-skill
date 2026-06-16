@@ -143,19 +143,46 @@ craft.
 
 ---
 
-## 6. Compose, don't build
-- **Landscape / competitive research** feeding `biz-review` or `spec-to-brief`: lean on
-  the existing `deep-research` plugin; document the handoff.
-- **User-research synthesis** (interview notes → insights): check existing plugins before
-  building suite-native.
+## 6. Compose, don't build — follow-ups
+
+With P0–P2 and the existing-skill fixes shipped, the remaining forward work is **not new
+skills** — it's documented handoffs to existing plugins so the suite *borrows* capability
+instead of duplicating it. These are the active near-term items.
+
+1. **Landscape / competitive evidence → `biz-review` / `spec-to-brief`.** ◻️ *Open.*
+   Before challenging a premise or writing demand evidence into a brief, run the existing
+   `deep-research` plugin (or `WebSearch` when offline) and feed its **cited** output in.
+   *Follow-up:* add an explicit "Composes with" note to both skills naming `deep-research`
+   as the source for landscape/competitive claims — so neither skill fabricates a market
+   claim. (`spec-to-brief` already sends unsourced demand claims to Open Questions; this
+   gives those questions a place to get a real answer.)
+2. **User-research synthesis → `spec-to-brief` / `biz-review`.** ◻️ *Open.*
+   "Interview notes → insights" is already solved by existing plugins (`interview-insights`);
+   do **not** build a suite-native version. *Follow-up:* document the
+   `interview-insights → spec-to-brief` handoff so real demand evidence (not assumptions)
+   flows into the brief and into `biz-review`'s demand-forcing questions.
+3. **Record the handoffs in `CLAUDE.md`,** not just here. ✅ *Done* — a "compose with
+   external plugins, don't rebuild" convention bullet now names the `deep-research` and
+   `interview-insights` handoffs where an editor of `biz-review` / `spec-to-brief` will see
+   them.
+
+**Guardrail for all three:** a handoff is a *pointer*, not a new dependency. The suite skills
+stay runnable without these plugins (they degrade to "Open Questions" / `WebSearch` /
+designer-supplied evidence); the plugins just make the evidence better when present.
 
 ---
 
 ## 7. Suggested sequence
-1. **P0 `spec-to-brief`** — completes the business half (generative, not just reactive).
-2. **P1 `figma-design-to-working-prototype`** — fuses pixels + behavior into one artifact.
-3. **Existing-skill fixes** (no-codebase mode) — fold in alongside.
-4. **P2 `critique-figma-design`** — the self-check tool, scoped to objective checks.
+
+All four prioritized items are **shipped** (see sections 4–5):
+
+1. ✅ **P0 `spec-to-brief`** — completes the business half (generative, not just reactive).
+2. ✅ **P1 `figma-design-to-working-prototype`** — fuses pixels + behavior into one artifact.
+3. ✅ **Existing-skill fixes** (no-codebase mode) — landed alongside P1 + P2.
+4. ✅ **P2 `critique-figma-design`** — the self-check tool, scoped to objective checks.
+
+Remaining forward work is the **compose-don't-build handoffs (section 6)** — documentation,
+not new skills — plus any net-new ideas that emerge from real use.
 
 Net effect: the designer keeps full ownership of designing in Figma, and the suite covers
 everything around it — **docs, code prototypes, business brief, handoff** — which is
