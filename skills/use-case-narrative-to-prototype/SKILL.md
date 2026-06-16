@@ -70,8 +70,20 @@ guidance. The core mapping:
 ### 3. Detect the stack and build
 
 Detect the target project's stack and conventions (framework, routing, styling, component
-patterns) and build within them. If there is no existing project to host the prototype,
-default to **React**, and confirm that default with the user before scaffolding.
+patterns) and build within them.
+
+**No codebase yet?** A pure designer often has no target repo — that is expected, not a
+blocker. Do not hunt for a stack to conform to. Instead, scaffold a fresh standalone app
+to host the prototype:
+
+- Default to **React**, and **confirm that default with the user** before scaffolding (offer
+  their stack if they have a preference).
+- Scaffold the minimum that runs and is walkable — a single app with client-side routing,
+  local mock state/data (no backend), and a dev server the user can open. Use the framework's
+  standard starter rather than hand-rolling configuration.
+- Tell the user how to run it, and keep it self-contained so it can be zipped or handed off.
+
+Once a host exists (detected or scaffolded), build within it as below.
 
 Build a prototype that is genuinely walkable: real navigation between screens, local mock
 state/data (no backend needed), and the interactions that let someone click the happy path

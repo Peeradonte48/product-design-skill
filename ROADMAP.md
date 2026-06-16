@@ -95,7 +95,14 @@ one. Generates: problem, target user, demand evidence, success metrics, scope de
 Composes cleanly **after** the two doc-review commands (run them as gates, then write the
 brief from what's left). Needs no Figma; can use `deep-research`/WebSearch for landscape.
 
-### P1 — `figma-design-to-working-prototype`
+### P1 — `figma-design-to-working-prototype` — ✅ SHIPPED
+**Status:** shipped. Thin orchestrator, **behavior-first** (skeleton via
+`use-case-narrative-to-prototype` → in-place **re-skin** via `implement-figma-design`),
+two-phase verification gate, proposed-then-confirmed frame↔step mapping, model-invocable with
+a both-inputs-required trigger. Decisions in
+`docs/superpowers/specs/2026-06-17-figma-design-to-working-prototype-design.md`; cross-skill
+dependency in `docs/adr/0002-p1-composes-sibling-suite-skills.md`.
+
 **Input → output:** finished Figma design **+** its flow/UCN → **pixel-faithful *and*
 behaviorally real** clickable prototype.
 
@@ -119,9 +126,11 @@ craft.
 
 ## 5. Fixes to existing skills
 
-1. **Add a "no codebase yet" mode.** The prototype/code skills should scaffold a fresh
-   standalone app gracefully when there's no target repo (a pure designer usually has
-   none) instead of hunting for a stack to conform to.
+1. **Add a "no codebase yet" mode.** *(Partially done — `use-case-narrative-to-prototype`
+   hardened alongside P1; `implement-figma-design`'s standalone case still open.)* The
+   prototype/code skills should scaffold a fresh standalone app gracefully when there's no
+   target repo (a pure designer usually has none) instead of hunting for a stack to conform
+   to.
 2. **Keep the code skills framed as the designer's allies,** not eng-only tools — the
    value is that the *designer* gets a clickable thing and a clean handoff.
 3. **Update `CLAUDE.md`** when new skills land (suite description, pipeline, contracts).
