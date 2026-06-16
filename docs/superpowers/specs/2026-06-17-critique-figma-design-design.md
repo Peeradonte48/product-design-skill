@@ -37,12 +37,14 @@ kinds of findings, kept visibly distinct so the designer always knows which is w
    `get_metadata`, `get_variable_defs`. No `figma-use`, no writes, ever.
 
 3. **Five check categories.** Four measured + one judgment:
-   - **Accessibility** *(measured)* — contrast ratios, touch-target sizes, min text sizes.
+   - **Accessibility** *(measured)* — contrast ratios (measured by the method in decision 8),
+     touch-target sizes (modality-aware, decision 8), min text sizes.
    - **Design-system consistency** *(measured)* — values not bound to a Figma variable / not
      in the token set; detached or overridden styles.
-   - **Structure & hierarchy** *(measured, checkable only)* — spacing-scale breaks,
-     misalignment, near-duplicate text styles, heading-size inversions. Excludes
-     subjective "balance/feel."
+   - **Structure & hierarchy** *(measured, checkable only)* — misalignment and near-duplicate
+     text styles always run; **spacing-scale breaks run only when explicit spacing tokens
+     exist** (decision 8); heading-size inversions require an evidenced role (decision 8).
+     Excludes subjective "balance/feel."
    - **Layer & naming hygiene** *(measured, lowest value)* — unnamed layers, ungrouped
      stacks, detached component instances.
    - **Heuristic evaluation — Nielsen's 10** *(judgment)* — each finding anchored to a
@@ -59,6 +61,11 @@ kinds of findings, kept visibly distinct so the designer always knows which is w
    - No finding may be a bare aesthetic preference ("make it bolder", "this color is ugly").
      If the only thing to say about something is taste, the skill stays silent — that is the
      designer's call.
+   - **Role-dependent measured checks must cite a role-signal (decision 8).** A check that
+     needs to know an element's role before measuring it (touch-target → "is interactive";
+     heading-inversion → "is a heading") MUST name the concrete evidence for that role. No
+     concrete signal → the element is not flagged (no guessing), and the coverage gap is
+     noted. The *number* stays measured; the *role* is evidenced, never assumed.
 
 5. **Thresholds & sources — conform to target.** A11y thresholds use the target project's
    documented rules first (e.g. CLAUDE.md touch-target / body-font minimums, a contrast
@@ -69,21 +76,52 @@ kinds of findings, kept visibly distinct so the designer always knows which is w
 
 6. **Report shape — severity-first measured, separate heuristic section, no score.**
    - Header counts: `Must-fix (n) · Should-fix (n) · Consider (n)` for measured findings,
-     plus `Heuristic: n findings (m partial)`.
+     plus a separate `Heuristic: n findings (m partial) · Must n · Should n · Consider n`.
    - **Measured findings** grouped severity-first, each category-tagged. Severity defaults:
      **Must-fix** = hard a11y failures (contrast / touch-target / text-size); **Should-fix** =
      off-token + structure breaks; **Consider** = layer/naming hygiene.
    - **Heuristic findings** in their own section, each tagged by heuristic (H1–H10) and
-     severity, with ⚠-partial markers for interaction-dependent ones.
+     severity, with ⚠-partial markers for interaction-dependent ones. Heuristic findings use
+     the **same Must-fix / Should-fix / Consider labels** for ordering within their section,
+     are **counted separately** in the header, and are **never merged** into the measured
+     severity totals — preserving the measured/heuristic firewall.
    - **No 0–100 quality score** — a numeric grade implies judging the design's goodness,
      which is taste-making. Report counts of objective violations instead.
-   - A clean category says so explicitly. A check that cannot be evaluated from the reads
-     (e.g. contrast needs a resolved background the reads can't supply) is reported as
+   - A clean category says so explicitly. A check that cannot be evaluated (e.g. contrast of
+     text over a busy photo/gradient with no dominant background even after screenshot
+     sampling; a spacing-scale check with no spacing tokens) is reported as
      **unable-to-check**, never as a pass.
 
 7. **Clarify-until-clear.** Opens with the suite's standard rule: if the target frame,
    selection, or which project's conventions apply is ambiguous, stop and ask rather than
    guessing.
+
+8. **Measurement methods & inference guardrails (resolved in grilling).**
+   - **Contrast** is measured by **sampling the rendered `get_screenshot` pixels** at the
+     text and its surrounding background (the screenshot is already composited, so it handles
+     transparency, gradients, and overlapping layers). **Fast-path:** when the text node and
+     its background are both single solid fills resolvable from the reads, use those exact hex
+     values. **unable-to-check** is reserved for the genuinely hard case (text over a busy
+     photo/gradient with no dominant background) — the exception, not the default.
+   - **Role inference is evidenced, never guessed.** Touch-target and heading checks require a
+     concrete role-signal — a component instance (e.g. `Button/primary`), a layer name
+     matching `btn|button|cta|link|field|input` (or heading-ish naming), or a clear
+     structural cue. No signal → not flagged → coverage gap noted. (Restates decision 4.)
+   - **Touch-target is modality-aware.** Infer input modality from frame width (~390–430px ⇒
+     touch; ~1280px+ ⇒ pointer) and target project type (Flutter/iOS ⇒ touch). Apply the
+     matching threshold — **touch ⇒ 44×44 iOS / 48 Android; pointer ⇒ 24×24 (WCAG 2.5.8)** —
+     and state the assumed modality + threshold + source in every touch-target finding. If
+     the signals conflict or are missing (e.g. a ~768px frame, no project), **ask**.
+   - **Spacing-scale is token-gated.** Flag a spacing-scale break **only** when explicit
+     spacing tokens exist (`get_variable_defs`); with no spacing tokens, mark it
+     unable-to-check (never infer a grid). Misalignment and near-duplicate-text-style checks
+     need no scale and always run.
+
+9. **Unit of work — per frame.** A selection spanning N frames produces **one report section
+   per frame** (each with its own header + counts), with a one-line roll-up of total counts
+   at the top. A selection of a sub-tree within one frame scopes the critique to that
+   sub-tree. If the selection is large (>~8 frames), note it and confirm scope rather than
+   silently grinding through everything (clarify-until-clear).
 
 ---
 
@@ -104,8 +142,10 @@ kinds of findings, kept visibly distinct so the designer always knows which is w
    Ask if the target is ambiguous.
 2. **Pull the reads.** `get_design_context`, `get_metadata`, `get_variable_defs`,
    `get_screenshot` — the ground truth for measurements and the token set.
-3. **Run the four measured categories.** For each finding, record location · value ·
-   threshold · source. Mark un-evaluable checks as unable-to-check.
+3. **Run the four measured categories** using the methods in decision 8 (screenshot-sampled
+   contrast, evidenced roles, modality-aware touch-targets, token-gated spacing-scale). For
+   each finding, record location · value · threshold · source. Mark un-evaluable checks as
+   unable-to-check; note any coverage gaps where a role-signal was absent.
 4. **Run the heuristic pass (Nielsen-10).** For each heuristic, look for the observable
    signals listed in `references/check-catalog.md`; anchor each finding to a specific
    element/state; mark interaction-dependent gaps ⚠-partial.
@@ -147,6 +187,11 @@ kinds of findings, kept visibly distinct so the designer always knows which is w
   as such, never as a pass.
 - **⚠ partial** — an interaction-dependent heuristic evaluated only as far as a static frame
   allows; the rest defers to the live flow.
+- **role-signal** — concrete evidence that an element has a role a check depends on (a
+  component instance, a matching layer name, or a structural cue). Required before any
+  role-dependent measured check fires; absent → not flagged.
+- **modality** — the input model assumed for a frame (touch vs pointer), inferred from frame
+  width and project type; selects the touch-target threshold and is stated per finding.
 
 ---
 
