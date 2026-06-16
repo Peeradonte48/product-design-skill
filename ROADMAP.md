@@ -126,11 +126,11 @@ craft.
 
 ## 5. Fixes to existing skills
 
-1. **Add a "no codebase yet" mode.** *(Partially done — `use-case-narrative-to-prototype`
-   hardened alongside P1; `implement-figma-design`'s standalone case still open.)* The
-   prototype/code skills should scaffold a fresh standalone app gracefully when there's no
-   target repo (a pure designer usually has none) instead of hunting for a stack to conform
-   to.
+1. **Add a "no codebase yet" mode.** ✅ **Done** — both `use-case-narrative-to-prototype`
+   (alongside P1) and `implement-figma-design` now scaffold a fresh standalone app gracefully
+   when there's no target repo (a pure designer usually has none) instead of hunting for a
+   stack to conform to. (`implement-figma-design`'s scaffold also sets up the
+   browser/screenshot tooling its diff-based verification needs.)
 2. **Keep the code skills framed as the designer's allies,** not eng-only tools — the
    value is that the *designer* gets a clickable thing and a clean handoff.
 3. **Update `CLAUDE.md`** when new skills land (suite description, pipeline, contracts).

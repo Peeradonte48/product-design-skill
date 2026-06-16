@@ -88,6 +88,21 @@ file structure, component patterns, and styling approach already in the repo rat
 introducing new ones. Reuse existing components where the design calls for something the
 codebase already has; don't reinvent a button that already exists.
 
+**No codebase yet?** A pure designer often has no target repo — that is expected, not a
+blocker. Do not hunt for a stack to conform to. Instead, scaffold a fresh standalone app to
+host the build:
+
+- Default to **React**, and **confirm that default with the user** before scaffolding (offer
+  their stack if they have a preference).
+- Scaffold the minimum that renders and runs — a single app with a dev server the user can
+  open, using the framework's standard starter rather than hand-rolling configuration.
+- Because this skill verifies by **screenshot diff** (step 4), also set up the
+  browser/screenshot tooling (e.g. Playwright) as part of the scaffold, so the match can
+  actually be proven rather than eyeballed.
+- Keep it self-contained so it can be zipped or handed off.
+
+Once a host exists (detected or scaffolded), build within it as below.
+
 If the design includes responsive breakpoints, implement every breakpoint to match — a
 match at one width that breaks at another is not a match. If the design only shows one
 width and you're unsure how it should reflow, ask.
