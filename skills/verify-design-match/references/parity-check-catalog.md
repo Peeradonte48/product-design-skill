@@ -2,7 +2,7 @@
 
 Single-owner reference (only `verify-design-match` uses it). Defines the five comparison
 categories, how each property is read from both sides, default tolerances, the element-matching
-algorithm, severity defaults, and the report template. Every finding cites its source; nothing
+algorithm, severity defaults, and the report templates (human PDF + AI-agent Markdown). Every finding cites its source; nothing
 here licenses an aesthetic-taste judgment — this is an objective conformance audit.
 
 ## Categories & properties
@@ -25,7 +25,10 @@ Conform to the **target project's documented rules first** (token system, any do
 allowed deviation); else use these defaults. **State which tolerance/source each finding used.**
 
 - **Sub-pixel:** differences ≤1px are ignored (anti-aliasing / rounding).
-- **Color:** compare by hex; treat ΔE ≤ 2 (near-identical rendered color) as a match.
+- **Color:** compare by hex; treat ΔE ≤ 2 (near-identical rendered color) as a match. Modern
+  CSS (Tailwind v4 / shadcn) reports computed colors as `oklch()` / `oklab()` — **convert to hex
+  (or compare in a common space) before diffing**; a raw `oklch(...)` string vs a Figma hex is
+  not a mismatch, only a different notation.
 - **Typography:** font-family, font-size, font-weight compared **exact**; line-height /
   letter-spacing use the ≤1px / ≤0.5px sub-pixel rule.
 - **Spacing / layout / sizing:** px against the paired node, ≤1px ignored.
@@ -36,7 +39,9 @@ allowed deviation); else use these defaults. **State which tolerance/source each
 Goal: pair each live element with its Figma node without guessing.
 
 1. **Normalize.** Render the live page at the frame's exact width so both share one coordinate
-   space (scale factor 1). All boxes are expressed relative to the frame origin.
+   space (scale factor 1). All boxes are expressed relative to the frame origin. If the form/list
+   sits in an inner scroll container, capture its full extent via a tall viewport (not DOM
+   mutation) so off-screen elements get real coordinates, not clipped/zero boxes.
 2. **Candidate pairs by geometry.** For each significant Figma node (leaf or labeled
    container), find live elements whose bounding box overlaps it; score overlap by IoU
    (intersection-over-union).
@@ -66,13 +71,30 @@ For each frame, each of the five categories gets one mark:
 - **⚠** — only Should-fix drift in that category.
 - **✗** — at least one Must-fix in that category.
 
-## Report template
+## Output formats
+
+Emit **both** a human **PDF** and an **AI-agent Markdown** report from the same assembled
+findings. One section **per mapped state** (a section may yield several states); the roll-up spans
+all states. A clean category says so (`✓`). A state where no pairs cleared the confidence bar
+reports that explicitly (all in couldn't-align) — never a silent pass.
+
+### Human report template (rendered to PDF)
+
+The PDF uses the **"clean editorial + dashboard"** layout in
+[`report-template.html`](report-template.html) (a styled skeleton with `{{PLACEHOLDER}}`
+slots): a title + meta line, a **summary dashboard** (Must-fix / Should-fix / Couldn't-align
+counts), a **per-state verdict matrix**, an optional **global-finding** callout, one **state
+card** per mapped state (index badge · title · node-id · verdict pills · side-by-side live/Figma
+images · findings grouped Must-fix → Should-fix → Within-tolerance), a **Couldn't-align** list,
+and a method footer. Fill the placeholders and render with the same Chromium
+(`page.setContent(html)` → `page.pdf({format:"A4", printBackground:true, margin:0})`). The plain
+structure below is the equivalent in text form:
 
 ```
 # Design-match report — <page/route> ↔ <figma file>
-Roll-up: <N> frames · Must-fix <m> · Should-fix <s> · couldn't-align <c>   (no overall score)
+Roll-up: <S> states · Must-fix <m> · Should-fix <s> · couldn't-align <c>   (no overall score)
 
-## Frame: <frame name> @ <width>px
+## State: <state name> — <frame name> (<node-id>) @ <width>px   [reach: <interaction recipe>]
 Color ✓ · Typography ✗ · Spacing ⚠ · Layout ✓ · Sizing ⚠
 
 ### Must-fix
@@ -86,5 +108,44 @@ Color ✓ · Typography ✗ · Spacing ⚠ · Layout ✓ · Sizing ⚠
 - live `.cookie-banner` — no Figma node (present live, absent in design)
 ```
 
-A clean category says so (`✓`). A frame where no pairs cleared the confidence bar reports that
-explicitly (all in couldn't-align) — never a silent pass.
+### AI-agent Markdown report (both layers)
+
+Layer 1 is a tool-agnostic, machine-readable findings block; layer 2 is an
+`implement-figma-design`-ready fix handoff. Both come from the same data — never contradict each
+other.
+
+```
+---
+report: design-match
+page: <route>
+figma_file: <fileKey>
+section: <section node-id, or "—">
+breakpoints: [<width>, …]
+generated_state_count: <S>
+rollup: { must_fix: <m>, should_fix: <s>, couldnt_align: <c> }   # no overall score
+authorized_live_writes: <true|false>            # were state-changing live actions run?
+---
+
+# Layer 1 — Findings (machine-readable)
+
+## State: <state name>  (frame <node-id> @ <width>px · reach: <recipe>)
+verdict: { color: ✓, typography: ✗, spacing: ⚠, layout: ✓, sizing: ⚠ }
+
+| sev | category | element (live) | node | property | live | figma | delta | tol/source |
+|-----|----------|----------------|------|----------|------|-------|-------|------------|
+| ✗ | typography | `.hero h1` | 12:3 | font-family | Inter | Söhne | family | exact |
+| ⚠ | spacing | `.cta` | 9:7 | padding-top | 12px | 16px | 4px | ≤1px default |
+
+couldnt_align:
+- node 14:2 'Badge/new' — no live match (0.31 < 0.6)
+- live `.cookie-banner` — no figma node
+
+# Layer 2 — Fix handoff (for implement-figma-design)
+
+## State: <state name>
+- [ ] `.hero h1` — set font-family to Figma `Söhne` (token <name>); currently `Inter`. (node 12:3)
+- [ ] `.cta` — set padding-top to `16px`; currently `12px`. (node 9:7)
+```
+
+Both files are written next to each other; the skill reports their paths and changes nothing in
+code or Figma.

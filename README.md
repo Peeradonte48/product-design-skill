@@ -31,7 +31,7 @@ Eleven skills across four groups. Most go **design/flow → code or doc**; `page
 | **[figjam-sitemap-to-spec](skills/figjam-sitemap-to-spec/SKILL.md)** | FigJam → spec | Reads a sitemap / site-structure diagram from FigJam and writes a **product spec** markdown doc (sitemap tree + per-page specs). Read-only; composes with the doc skills and build skills. |
 | **[page-to-figma](skills/page-to-figma/SKILL.md)** | running page → Figma | Transcribes a **running** product page into a 1:1 Figma frame. Extracts live-DOM computed styles as ground truth, delegates the build to the official Figma plugin, then gates on a **numeric property read-back** — correcting until every value matches. *(Requires the official Figma plugin.)* |
 | **[critique-figma-design](skills/critique-figma-design/SKILL.md)** | Figma frame → critique *(command-only)* | A **read-only** self-check that runs a finished Figma frame through an objective checklist and returns a severity-ranked report: four **measured** categories (accessibility, design-system consistency, structure/hierarchy, layer hygiene — each finding citing value · threshold · source) plus an evidence-anchored **Nielsen-10 heuristic** pass. A self-check, not a taste-maker — no aesthetic preference, no quality score. Runs only when you type `/critique-figma-design`. |
-| **[verify-design-match](skills/verify-design-match/SKILL.md)** | running page ↔ Figma *(command-only)* | A **read-only** parity audit: compares a running page against the finished Figma frame(s) it should match and reports, **per breakpoint**, where the implementation diverges — changing nothing. Visual pass (screenshot overlay) locates regions; property pass (measured DOM-vs-Figma diff) quantifies them; matching is geometry-first/text-anchored with a "couldn't align" gap list. Output is a per-category ✓/⚠/✗ verdict + cited findings, **no overall score**. Runs only when you type `/verify-design-match`. *(Requires Playwright + Figma access.)* |
+| **[verify-design-match](skills/verify-design-match/SKILL.md)** | running page ↔ Figma frame/section *(command-only)* | A **read-only** parity audit: compares a running page against the finished Figma frame(s) — **or a whole section of state-variant frames** — and reports, **per breakpoint and per state**, where the implementation diverges. Read-only on code & Figma; may drive the live app to reach states **only with your authorization**. Section inputs are **auto-matched then ask-the-gaps** (you supply the route + interaction recipe for states it can't reach). Visual pass locates regions; property pass quantifies them; matching is geometry-first/text-anchored with a "couldn't align" gap list. Output is a per-category ✓/⚠/✗ verdict + cited findings, **no overall score**, emitted as **both a PDF and an AI-agent Markdown handoff** (feeds `implement-figma-design`). Runs only when you type `/verify-design-match`. *(Requires Playwright + Figma access.)* |
 
 ### 4. Doc skills — no Figma required
 
@@ -52,7 +52,7 @@ Eleven skills across four groups. Most go **design/flow → code or doc**; `page
   FigJam sitemap   ──▶  figjam-sitemap-to-spec  ──▶  product-spec.md
   Running page     ──▶  page-to-figma  ──▶  pixel-perfect Figma frame
   Finished frame   ──▶  /critique-figma-design  ──▶  severity-ranked self-check (read-only)
-  Running page+Figma──▶  /verify-design-match  ──▶  per-breakpoint parity report (read-only)
+  Running page+Figma──▶  /verify-design-match  ──▶  per-state parity report: PDF + AI-agent MD (read-only)
   Any plan/spec    ──▶  /biz-review  ──▶  /harden-doc  ──▶  spec-to-brief  ──▶  stakeholder brief
 ```
 
@@ -142,8 +142,8 @@ Most skills trigger automatically from natural language — you generally don't 
 - **Objective self-check of a Figma frame:**
   > `/critique-figma-design` *(with the frame selected / linked)*
 
-- **Check a running page matches its Figma design:**
-  > `/verify-design-match` *(with the page URL/route and the Figma frame(s) it should match)*
+- **Check a running page matches its Figma design (any/all states):**
+  > `/verify-design-match` *(with the page URL/route and the Figma frame **or section** it should match; it auto-matches the default state and asks you for the route + recipe of any others, then emits a PDF + an AI-agent Markdown report)*
 
 - **Stress-test a plan or spec until every branch is resolved:**
   > `/harden-doc docs/specs/pos-spec.md`
