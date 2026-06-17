@@ -39,6 +39,17 @@ prefer omitting the ungrounded detail over inventing it, and record it in the co
 report (step 4) so the user can fill it in. Reserve the hard stop for the required-section
 gaps above — the things a narrative is meaningless without.
 
+## When NOT to use
+
+- The FigJam board is a **sitemap / IA / site-structure** diagram (pages and how they
+  nest), not a user **flow** (steps, decisions, end states) → `figjam-sitemap-to-spec`,
+  which writes a product spec instead of a narrative. If a bare FigJam link could be
+  either, look at the board: connected steps and decision branches → this skill; a tree
+  of named pages → the sitemap skill. When it's genuinely ambiguous, ask the user which
+  one they want rather than guessing.
+- The user wants the flow **built as a clickable prototype**, not written up →
+  `use-case-narrative-to-prototype` (this skill produces its input doc first).
+
 ## Workflow
 
 ### 1. Read the diagram (ground truth, don't infer from the picture alone)

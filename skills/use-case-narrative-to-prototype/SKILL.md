@@ -21,7 +21,10 @@ branches and errors that matter.
 This is **behavioral fidelity, not pixel fidelity.** The UCN says *what happens*, not what
 it looks like down to the hex. Build sensible, clean default UI and make the *flow* correct.
 If a Figma design for these screens also exists, that's the job of `implement-figma-design`
-(the Figma-design → code path) — note the handoff rather than guessing visuals here.
+(the Figma-design → code path) — note the handoff rather than guessing visuals here. And if
+the user wants **one** artifact that is both walkable *and* pixel-perfect from that design +
+this flow, that's the fusion orchestrator `figma-design-to-working-prototype` — it calls this
+skill to build the skeleton, then re-skins it; let it drive rather than running standalone.
 
 This is step 3 of the pipeline **FigJam → narrative → prototype**; the narrative it reads
 is exactly what `figjam-to-use-case-narrative` produces.

@@ -260,7 +260,8 @@ skills/
 ├── critique-figma-design/
 │   ├── SKILL.md                             # read-only Figma self-check (/critique-figma-design)
 │   └── references/
-│       └── check-catalog.md                 # measured checks + thresholds + Nielsen-10 catalog
+│       ├── check-catalog.md                 # measured checks + thresholds + Nielsen-10 catalog
+│       └── report-template.html             # optional styled PDF report skeleton (editorial + dashboard)
 ├── verify-design-match/
 │   ├── SKILL.md                             # read-only live↔Figma parity audit (/verify-design-match)
 │   └── references/
