@@ -90,6 +90,8 @@ cd product-design-skill
 ./install.sh                 # user-level   → ~/.claude/skills
 ./install.sh --project       # project-only → ./.claude/skills (run from your project root)
 ./install.sh --dir <path>    # custom skills directory
+./install.sh --update        # update installed skills to the latest (no prompts)
+./install.sh --check         # report installed vs latest version, then exit
 ./install.sh --force         # overwrite existing copies without prompting
 ./install.sh --uninstall     # remove the eleven skills
 ```
@@ -107,6 +109,22 @@ cp -R skills/* /path/to/project/.claude/skills/
 After installing, restart Claude Code (or run `/doctor`) so it discovers the new skills.
 
 **User-level vs project-level:** install to `~/.claude/skills` to use the skills in every project; install to a project's `.claude/skills` to scope them to that repo (and commit them with the project).
+
+### Updating (already installed?)
+
+The suite is versioned (see [`VERSION`](VERSION)). To pull the latest, **re-run the installer with `--update`** — it overwrites only the skills that changed, skips unchanged ones, removes any skill dropped from the suite, and prints a summary:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash -s -- --update
+```
+
+Check whether you're behind without changing anything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash -s -- --check
+```
+
+(Cloned the repo instead? `git pull` then `./install.sh --update`.) Each install stamps a small `~/.claude/skills/.product-design-skill.version` manifest so `--check`/`--update` know what you have. Then restart Claude Code (or run `/doctor`).
 
 ---
 
