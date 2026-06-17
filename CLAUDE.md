@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-This is a **skill-only scaffold**, not an application. It contains eleven portable, stack-agnostic Claude Code skills under [skills/](skills/) and nothing else — no `package.json`, no source tree, and no test setup. There are therefore no build/lint/test commands to document. If real app code is ever added, update this file with the actual commands.
+This is a **skill-only scaffold**, not an application. It contains eleven portable, stack-agnostic Claude Code skills under [skills/](skills/), plus the `install.sh` installer and a `VERSION` file — no `package.json`, no source tree, and no test setup. There are therefore no build/lint/test commands to document. If real app code is ever added, update this file with the actual commands.
+
+The only other tracked content is [docs/](docs/), which is **ADRs only** (`docs/adr/0001–0003` — architecture decision records referenced from this file, the README, and a couple of skills). `docs/` is gitignored and **not shipped** to users (the installer copies `skills/` only), so new files there need `git add -f`. The one-time brainstorm specs and implementation plans that used to live under `docs/superpowers/` were removed — don't expect them, and don't re-add SDD process artifacts as tracked files.
 
 The skills are deliberately **not** tied to any one project, framework, or design system. They detect and conform to whatever target project they're run against. (An earlier version of this repo hardcoded a "Ramen POS / Next.js / Tailwind" target; that coupling has been removed — do not reintroduce project-specific assumptions into the skills.)
 
