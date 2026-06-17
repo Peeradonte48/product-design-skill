@@ -78,7 +78,19 @@ specific element/state and say why it signals that heuristic. Mark interaction-d
 
 ### 5. Assemble the report
 One section **per frame** (a multi-frame selection → one section each + a one-line roll-up; a
-sub-tree selection → scope to it; >~8 frames → confirm scope first). Shape:
+sub-tree selection → scope to it; >~8 frames → confirm scope first). Keep **measured** and
+**heuristic** findings in separate blocks; never merge their counts; **no quality score.**
+
+Emit the **plain-markdown** form below by default — it needs no dependency. **Optionally**, when
+browser tooling (Playwright/Chromium) is available, also render the styled
+**"clean editorial + dashboard"** skeleton in [`references/report-template.html`](references/report-template.html)
+(a `{{PLACEHOLDER}}` skeleton: meta → measured-summary dashboard + separate heuristic strip →
+measured-category status matrix → per-frame cards with the frame screenshot, a MEASURED block
+grouped Must-fix → Should-fix → Consider → ⊘ Unable-to-check, then a visibly separate HEURISTIC
+block) and turn it into a PDF with that same Chromium (`page.setContent(html)` →
+`page.pdf({format:"A4", printBackground:true, margin:0})`). This skill has **no** browser
+dependency — never block on it: if no browser is present, the markdown form is the whole output.
+The `⊘ unable-to-check` state is **never** rendered as a pass. The plain form:
 
 ```
 ## Critique: <frame name>
@@ -98,11 +110,15 @@ Heuristic — n findings (m partial) · Must n · Should n · Consider n
 - [H3 User control · Consider] ⚠ needs live flow — no visible back/cancel on the confirm step
 ```
 
-Keep **measured** and **heuristic** findings in separate sections; never merge their counts. A
-clean category says so explicitly.
+A clean category says so explicitly (✓), and an un-evaluable check is marked `⊘ unable-to-check`
+— never a silent pass.
 
 ## Dependencies
 
 - **Figma MCP read tools only:** `get_design_context`, `get_screenshot`, `get_metadata`,
   `get_variable_defs`. No `figma-use`. No write tools. This skill is standalone — it depends on
   no other suite skill.
+- **Output:** a plain-markdown report by default (a file write — **no dependency**). A styled
+  **PDF** is **optional**: rendered from `references/report-template.html` only when browser
+  tooling (Playwright/Chromium) happens to be present — it is **not** a required dependency, so
+  the skill never blocks for it. Either way it writes **nothing** to Figma.

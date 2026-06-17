@@ -23,7 +23,11 @@ This skill depends only on the **Figma plugin (MCP)** for ground truth — no ot
 or services are required. It is the **Figma-design → code** path. Its siblings are
 `figjam-to-use-case-narrative` (FigJam flow → narrative doc) and
 `use-case-narrative-to-prototype` (narrative doc → code prototype); reach for those when
-you have a flow diagram or a written narrative instead of a finished design.
+you have a flow diagram or a written narrative instead of a finished design. If you have
+**both** a finished Figma design **and** a flow/UCN for the same screens and want one
+artifact that is pixel-perfect *and* walkable, defer to `figma-design-to-working-prototype`
+(the fusion orchestrator) — it builds the walkable skeleton first, then calls this skill to
+re-skin it. Use this skill directly when there is a design but **no** flow.
 
 ## Before you proceed — ask until clear
 

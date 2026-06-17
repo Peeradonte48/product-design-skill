@@ -1,0 +1,169 @@
+<!doctype html>
+<!--
+  critique-figma-design — human report template (objective self-check, READ-ONLY).
+  Optional output: render to PDF only if browser tooling (Playwright/Chromium) is present —
+  page.setContent(html) → page.pdf({format:"A4", printBackground:true, margin:0}). This skill
+  has NO browser dependency; when none is available, emit the plain-markdown form in SKILL.md
+  instead. Either way the skill writes nothing to Figma.
+  Style: "clean editorial + dashboard" (matches verify-design-match's report-template.html).
+  Fill the {{PLACEHOLDER}} slots; repeat the marked blocks (one .frame per critiqued frame,
+  one .find per finding).
+  INVARIANTS — do not break:
+    • NO 0–100 quality score, ever (a grade is taste-making).
+    • MEASURED and HEURISTIC findings stay in visibly separate blocks; never merge their counts.
+    • Every MEASURED finding cites location · value · threshold · source.
+    • Every HEURISTIC finding cites a named Nielsen heuristic (H1–H10) · a specific observable · why.
+    • ⊘ unable-to-check is NOT a pass — render it distinctly, never as ✓.
+  Severity tiers: ✗ Must-fix · ⚠ Should-fix · • Consider.  Category glyphs: ✓ clean · ⚠ should-fix · ✗ must-fix · ⊘ unable-to-check.
+  Contrast is from screenshot-pixel-sampling (or solid-fill fast-path); thresholds per project rule first, else WCAG AA + platform defaults.
+-->
+<html><head><meta charset="utf-8"><style>
+:root{--ink:#0b0b0c;--sub:#6b7280;--faint:#f6f7f8;--hair:#e6e7e9;--accent:#111113;
+  --red:#dc2626;--redbg:#fef2f2;--amber:#b45309;--amberbg:#fffbeb;--green:#15803d;--greenbg:#f0fdf4;
+  --slate:#475569;--slatebg:#f1f5f9;--indigo:#4338ca;--indigobg:#eef2ff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Inter",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);
+  font-size:12px;line-height:1.55;-webkit-font-smoothing:antialiased;background:#fff}
+.page{width:794px;margin:0 auto;padding:56px 60px 40px}
+.tick{height:4px;width:56px;background:var(--accent);border-radius:2px;margin-bottom:22px}
+h1{font-size:27px;font-weight:760;letter-spacing:-.025em;line-height:1.1}
+.lede{color:var(--sub);font-size:12.5px;margin-top:7px}
+.lede code{color:var(--ink);background:var(--faint);padding:1px 6px;border-radius:5px;font-size:11px;font-family:ui-monospace,Menlo,monospace}
+.meta{display:flex;gap:18px;color:var(--sub);font-size:11px;margin-top:12px;flex-wrap:wrap;letter-spacing:.02em}
+.meta b{color:var(--ink);font-weight:600}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--sub);margin:30px 0 12px}
+.eyebrow .sub{color:var(--sub);font-weight:600;letter-spacing:.02em;text-transform:none;font-size:10px}
+.dash{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--hair);border-radius:14px;overflow:hidden}
+.dash .cell{padding:20px 22px;border-right:1px solid var(--hair)}
+.dash .cell:last-child{border-right:0}
+.dash .num{font-size:38px;font-weight:770;letter-spacing:-.03em;line-height:1}
+.dash .num.red{color:var(--red)}.dash .num.amber{color:var(--amber)}.dash .num.grey{color:var(--sub)}
+.dash .lbl{font-size:10.5px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-top:8px}
+.heurbar{display:flex;align-items:baseline;gap:10px;border:1px solid var(--indigobg);background:var(--indigobg);border-radius:12px;padding:13px 18px;margin-top:12px}
+.heurbar .n{font-size:22px;font-weight:760;color:var(--indigo);letter-spacing:-.02em;line-height:1}
+.heurbar .t{font-size:11px;color:#3730a3}.heurbar .t b{font-weight:700}
+.heurbar .part{margin-left:auto;font-size:10px;color:var(--sub);font-style:italic}
+.noscore{text-align:right;color:var(--sub);font-size:10px;margin-top:6px;font-style:italic}
+table.matrix{width:100%;border-collapse:collapse;margin-top:4px;font-size:11.5px}
+table.matrix th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);font-weight:650;text-align:center;padding:8px 6px;border-bottom:1px solid var(--hair)}
+table.matrix th.l,table.matrix td.l{text-align:left}
+table.matrix td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--hair)}
+table.matrix td.l{font-weight:600}
+table.matrix tr:last-child td{border-bottom:0}
+.m{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;font-size:11px;font-weight:700}
+.m.ok{color:var(--green);background:var(--greenbg)}.m.bad{color:var(--red);background:var(--redbg)}.m.warn{color:var(--amber);background:var(--amberbg)}
+.m.na{color:var(--slate);background:var(--slatebg)}
+.frame{border:1px solid var(--hair);border-radius:16px;padding:24px 26px;margin-top:20px;page-break-inside:avoid}
+.frame .head{display:flex;align-items:center;gap:13px;margin-bottom:4px}
+.frame .idx{font-size:11px;font-weight:750;color:#fff;background:var(--accent);width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.frame h2{font-size:16px;font-weight:700;letter-spacing:-.015em}
+.frame .node{font-size:10.5px;color:var(--sub);font-family:ui-monospace,Menlo,monospace;background:var(--faint);padding:2px 7px;border-radius:6px}
+.frame .ctx{color:var(--sub);font-size:10.5px;margin:2px 0 0 39px}
+.shot{margin:16px 0;border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--faint)}
+.shot img{width:100%;display:block;max-height:460px;object-fit:contain;object-position:top;background:var(--faint)}
+.shot figcaption{font-size:10px;color:var(--sub);padding:7px 10px;border-top:1px solid var(--hair);letter-spacing:.03em}
+.block{margin-top:18px}
+.block .bh{font-size:11px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:9px}
+.block .bh .tag{font-size:9px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px}
+.block.measured .bh .tag{color:var(--ink);background:var(--faint);border:1px solid var(--hair)}
+.block.heur .bh .tag{color:var(--indigo);background:var(--indigobg)}
+.block .bh .note{font-weight:600;font-size:9.5px;letter-spacing:.02em;text-transform:none;color:var(--sub)}
+.grp{margin-top:12px}
+.grp .gh{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}
+.grp .gh .cnt{color:var(--sub);font-weight:600;letter-spacing:0}
+.find{display:flex;gap:11px;padding:11px 13px;border:1px solid var(--hair);border-radius:10px;margin-bottom:7px;background:#fff}
+.find.must{border-left:3px solid var(--red)}.find.should{border-left:3px solid var(--amber)}.find.consider{border-left:3px solid var(--sub)}
+.find.na{border-left:3px solid var(--slate);background:var(--slatebg)}
+.find.heurf{border-left:3px solid var(--indigo)}
+.find .stag{flex:none;font-size:9px;font-weight:750;letter-spacing:.05em;padding:3px 7px;border-radius:6px;height:fit-content;margin-top:1px;white-space:nowrap}
+.find.must .stag{color:var(--red);background:var(--redbg)}.find.should .stag{color:var(--amber);background:var(--amberbg)}.find.consider .stag{color:var(--sub);background:var(--faint)}
+.find.na .stag{color:var(--slate);background:#fff;border:1px solid var(--hair)}
+.find.heurf .stag{color:var(--indigo);background:var(--indigobg)}
+.find .ftxt{font-size:11.5px;line-height:1.5}.find .cat{font-weight:700}
+.find .part{display:inline-block;font-size:9px;font-weight:700;color:var(--amber);background:var(--amberbg);padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:1px}
+.find .cite{color:var(--sub);font-size:10px;margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.clean{font-size:11px;color:var(--green);background:var(--greenbg);border:1px solid #cdeBcd;border-radius:8px;padding:8px 12px;margin-top:10px}
+.foot{margin-top:30px;padding-top:13px;border-top:1px solid var(--hair);color:var(--sub);font-size:9.5px;line-height:1.6}
+</style></head><body><div class="page">
+
+  <div class="tick"></div>
+  <h1>Design critique</h1>
+  <div class="lede">{{FRAME_NAME}} &nbsp;·&nbsp; <code>{{NODE_ID}}</code></div>
+  <div class="meta">
+    <span><b>Modality</b> {{MODALITY}} ({{TARGET_THRESHOLD}})</span>
+    <span><b>Contrast std</b> {{CONTRAST_SOURCE}}</span>
+    <span><b>Frames</b> {{FRAME_COUNT}}</span>
+    <span><b>Date</b> {{DATE}}</span>
+    <span><b>Mode</b> read-only · self-check</span>
+  </div>
+
+  <div class="eyebrow">Measured summary</div>
+  <div class="dash">
+    <div class="cell"><div class="num red">{{MUST}}</div><div class="lbl">Must-fix</div></div>
+    <div class="cell"><div class="num amber">{{SHOULD}}</div><div class="lbl">Should-fix</div></div>
+    <div class="cell"><div class="num grey">{{CONSIDER}}</div><div class="lbl">Consider</div></div>
+  </div>
+  <!-- Heuristic findings are a SEPARATE axis — never folded into the measured counts above. -->
+  <div class="heurbar">
+    <span class="n">{{HEUR_TOTAL}}</span>
+    <span class="t"><b>Heuristic findings</b> (Nielsen-10) &nbsp;·&nbsp; Must {{HEUR_MUST}} · Should {{HEUR_SHOULD}} · Consider {{HEUR_CONSIDER}}</span>
+    <span class="part">{{HEUR_PARTIAL}} need live flow — partial</span>
+  </div>
+  <div class="noscore">no quality score — findings are measured violations + cited heuristics only</div>
+
+  <div class="eyebrow">Measured category status</div>
+  <table class="matrix">
+    <thead><tr><th class="l">Category</th><th>Status</th><th>Must</th><th>Should</th><th>Consider</th></tr></thead>
+    <tbody>
+      <!-- glyphs: <span class="m ok">✓</span> clean · <span class="m warn">⚠</span> should-fix · <span class="m bad">✗</span> must-fix · <span class="m na">⊘</span> unable-to-check (NOT a pass) -->
+      <tr><td class="l">Accessibility</td><td>{{A_STATUS}}</td><td>{{A_MUST}}</td><td>{{A_SHOULD}}</td><td>{{A_CONSIDER}}</td></tr>
+      <tr><td class="l">Design-system consistency</td><td>{{D_STATUS}}</td><td>{{D_MUST}}</td><td>{{D_SHOULD}}</td><td>{{D_CONSIDER}}</td></tr>
+      <tr><td class="l">Structure &amp; hierarchy</td><td>{{S_STATUS}}</td><td>{{S_MUST}}</td><td>{{S_SHOULD}}</td><td>{{S_CONSIDER}}</td></tr>
+      <tr><td class="l">Layer &amp; naming hygiene</td><td>{{H_STATUS}}</td><td>{{H_MUST}}</td><td>{{H_SHOULD}}</td><td>{{H_CONSIDER}}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="eyebrow">Frames</div>
+
+  <!-- ===== repeat one .frame block per critiqued frame ===== -->
+  <section class="frame">
+    <div class="head"><div class="idx">{{NN}}</div><h2>{{FRAME_TITLE}}</h2><span class="node">{{NODE_ID}}</span></div>
+    <div class="ctx">{{MODALITY}} · {{CONTRAST_SOURCE}} · {{CONVENTIONS — e.g. project rules detected, else WCAG AA + platform defaults}}</div>
+    <figure class="shot">
+      <img src="{{FRAME_IMG_DATA_URI}}"><figcaption>FIGMA · {{FRAME_CAPTION}}</figcaption>
+    </figure>
+
+    <!-- ============ MEASURED block (cites location · value · threshold · source) ============ -->
+    <div class="block measured">
+      <div class="bh"><span class="tag">MEASURED</span> <span class="note">objective — value vs threshold</span></div>
+      <!-- group by severity: Must-fix → Should-fix → Consider → Unable-to-check. Omit empty groups. -->
+      <div class="grp"><div class="gh">Must-fix <span class="cnt">· {{N}}</span></div>
+        <div class="find must"><span class="stag">✗ {{CATEGORY}}</span><div><div class="ftxt">{{FINDING}}</div><div class="cite">{{LAYER · NODE · VALUE vs THRESHOLD · SOURCE}}</div></div></div>
+      </div>
+      <div class="grp"><div class="gh">Should-fix <span class="cnt">· {{N}}</span></div>
+        <div class="find should"><span class="stag">⚠ {{CATEGORY}}</span><div><div class="ftxt">{{FINDING}}</div><div class="cite">{{CITATION}}</div></div></div>
+      </div>
+      <div class="grp"><div class="gh">Consider <span class="cnt">· {{N}}</span></div>
+        <div class="find consider"><span class="stag">• {{CATEGORY}}</span><div><div class="ftxt">{{FINDING}}</div><div class="cite">{{CITATION}}</div></div></div>
+      </div>
+      <div class="grp"><div class="gh">Unable to check <span class="cnt">· {{N}}</span></div>
+        <div class="find na"><span class="stag">⊘ {{CATEGORY}}</span><div><div class="ftxt">{{WHAT COULD NOT BE MEASURED AND WHY — e.g. text over a busy photo; no spacing tokens}}</div><div class="cite">{{LAYER · NODE · why un-evaluable — NOT a pass}}</div></div></div>
+      </div>
+      <!-- if a measured category is fully clean: -->
+      <div class="clean">✓ {{CATEGORY}} — no measured violations.</div>
+    </div>
+
+    <!-- ============ HEURISTIC block (Nielsen-10, judgment-based, kept visibly separate) ============ -->
+    <div class="block heur">
+      <div class="bh"><span class="tag">HEURISTIC · NIELSEN-10</span> <span class="note">judgment-based — named heuristic + observable</span></div>
+      <div class="grp">
+        <!-- one .find.heurf per heuristic finding. stag = H# + tier. Add <span class="part">⚠ needs live flow</span> for interaction-dependent partials. -->
+        <div class="find heurf"><span class="stag">H4 · Should</span><div><div class="ftxt">{{WHAT WAS OBSERVED}} <span class="part">⚠ needs live flow</span></div><div class="cite">{{NAMED HEURISTIC · element/state · why it signals this heuristic · nodes}}</div></div></div>
+      </div>
+    </div>
+  </section>
+  <!-- ===== end .frame ===== -->
+
+  <div class="foot">{{TOOLING / METHOD NOTE — e.g. Generated by critique-figma-design (read-only self-check); Figma MCP read tools only (get_design_context · get_metadata · get_variable_defs · get_screenshot); contrast by screenshot-pixel-sampling; thresholds per check-catalog.md (project rule first, else WCAG AA + platform defaults). No writes to Figma. No quality score.}}</div>
+
+</div></body></html>

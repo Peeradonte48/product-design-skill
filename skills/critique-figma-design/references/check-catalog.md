@@ -5,6 +5,12 @@ measured thresholds, how to measure each from the read-only MCP, and the observa
 for each Nielsen heuristic. Every finding cites its source; nothing here licenses an
 aesthetic-taste judgment.
 
+The report itself has two forms: the plain-markdown shape in `SKILL.md` (always emitted, no
+dependency) and an **optional** styled PDF rendered from
+[`report-template.html`](report-template.html) when browser tooling is present — a "clean
+editorial + dashboard" skeleton keeping **measured** (✗/⚠/• + ⊘ unable-to-check) and
+**heuristic** (Nielsen-10) findings in visibly separate blocks, with **no quality score**.
+
 ## Measured checks
 
 Each measured finding records: **location (layer name + node id) · measured value · threshold

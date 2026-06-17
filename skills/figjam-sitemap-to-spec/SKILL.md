@@ -39,6 +39,15 @@ until it's clear.** Batch related questions, but do not write a section you had 
 A confidently-worded spec built on a guess is worse than an explicit "this page isn't
 described on the board — what is it for?"
 
+## When NOT to use
+
+- The FigJam board is a user **flow** (start node, steps, decision branches, end states),
+  not a **sitemap / IA / site-structure** tree → `figjam-to-use-case-narrative`, which
+  writes a use-case narrative instead of a spec. If a bare FigJam link could be either,
+  look at the board: a tree of named pages → this skill; connected steps and decision
+  branches → the narrative skill. When it's genuinely ambiguous, ask the user which one
+  they want rather than guessing.
+
 ## Workflow
 
 ### 1. Read the sitemap (ground truth, don't infer from the picture alone)
