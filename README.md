@@ -264,7 +264,8 @@ skills/
 ├── verify-design-match/
 │   ├── SKILL.md                             # read-only live↔Figma parity audit (/verify-design-match)
 │   └── references/
-│       └── parity-check-catalog.md          # categories, tolerances, matching algorithm, report template
+│       ├── parity-check-catalog.md          # categories, tolerances, matching algorithm, report templates
+│       └── report-template.html             # styled PDF report skeleton (editorial + dashboard)
 ├── harden-doc/
 │   └── SKILL.md                             # doc command: resolve every decision branch (/harden-doc)
 ├── biz-review/
@@ -273,6 +274,12 @@ skills/
     ├── SKILL.md                             # generative: spec/UCN → stakeholder brief
     └── references/
         └── product-brief-template.md        # flexible product-brief template (single-owner)
+
+docs/                                        # ADRs only — gitignored, not shipped to users
+└── adr/
+    ├── 0001-page-to-figma-depends-on-official-figma-plugin.md
+    ├── 0002-p1-composes-sibling-suite-skills.md
+    └── 0003-verify-design-match-requires-playwright-and-figma-access.md
 ```
 
 > **Shared format contract:** the two `references/use-case-narrative-format.md` files are byte-identical on purpose — one skill writes the format, the other reads it. **If you edit one, edit the other to match.**
