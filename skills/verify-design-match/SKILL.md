@@ -138,8 +138,10 @@ align."
   spacing, layout, sizing), then severity-ranked findings (Must-fix, Should-fix), then "Couldn't
   align." Top the report with a one-line roll-up **across all states**. **No overall score.**
 - **Emit BOTH formats** (templates in the catalog):
-  - **PDF** — human-readable; render the assembled HTML via the Chromium you already have
-    (`page.pdf()`). No extra dependency.
+  - **PDF** — human-readable; fill the styled **"clean editorial + dashboard"** skeleton in
+    `references/report-template.html` (summary dashboard → per-state verdict matrix → state cards
+    with side-by-side images + grouped findings → couldn't-align), then render via the Chromium
+    you already have (`page.setContent(html)` → `page.pdf()`). No extra dependency.
   - **Markdown (AI-agent), both layers** — a tool-agnostic machine-readable findings block (YAML
     frontmatter + per-state/per-category tables) **plus** an `implement-figma-design`-ready
     handoff section (per-state fix list: element · property · current · target · source).

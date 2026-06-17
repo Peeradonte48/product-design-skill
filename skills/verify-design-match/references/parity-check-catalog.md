@@ -80,6 +80,16 @@ reports that explicitly (all in couldn't-align) — never a silent pass.
 
 ### Human report template (rendered to PDF)
 
+The PDF uses the **"clean editorial + dashboard"** layout in
+[`report-template.html`](report-template.html) (a styled skeleton with `{{PLACEHOLDER}}`
+slots): a title + meta line, a **summary dashboard** (Must-fix / Should-fix / Couldn't-align
+counts), a **per-state verdict matrix**, an optional **global-finding** callout, one **state
+card** per mapped state (index badge · title · node-id · verdict pills · side-by-side live/Figma
+images · findings grouped Must-fix → Should-fix → Within-tolerance), a **Couldn't-align** list,
+and a method footer. Fill the placeholders and render with the same Chromium
+(`page.setContent(html)` → `page.pdf({format:"A4", printBackground:true, margin:0})`). The plain
+structure below is the equivalent in text form:
+
 ```
 # Design-match report — <page/route> ↔ <figma file>
 Roll-up: <S> states · Must-fix <m> · Should-fix <s> · couldn't-align <c>   (no overall score)

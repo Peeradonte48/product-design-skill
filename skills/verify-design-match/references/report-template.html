@@ -1,0 +1,142 @@
+<!doctype html>
+<!--
+  verify-design-match — human PDF report template (render to PDF via the same Chromium:
+  page.setContent(html) → page.pdf({format:"A4", printBackground:true, margin:0}).
+  Style: "clean editorial + dashboard". Fill the {{PLACEHOLDER}} slots and repeat the
+  marked blocks (one .state per mapped state, one .find per finding). Keep the structure:
+  tick → title → meta → SUMMARY dashboard → per-state verdict matrix → GLOBAL callout
+  (optional) → state cards → couldn't-align → footer. NO overall score — ever.
+  Status glyphs: ✓ within tolerance · ⚠ should-fix · ✗ must-fix.
+  Colors are converted from live oklch()/oklab() to hex before comparison.
+-->
+<html><head><meta charset="utf-8"><style>
+:root{--ink:#0b0b0c;--sub:#6b7280;--faint:#f6f7f8;--hair:#e6e7e9;--accent:#111113;
+  --red:#dc2626;--redbg:#fef2f2;--amber:#b45309;--amberbg:#fffbeb;--green:#15803d;--greenbg:#f0fdf4;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Inter",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);
+  font-size:12px;line-height:1.55;-webkit-font-smoothing:antialiased;background:#fff}
+.page{width:794px;margin:0 auto;padding:56px 60px 40px}
+.tick{height:4px;width:56px;background:var(--accent);border-radius:2px;margin-bottom:22px}
+h1{font-size:27px;font-weight:760;letter-spacing:-.025em;line-height:1.1}
+.lede{color:var(--sub);font-size:12.5px;margin-top:7px}
+.lede code{color:var(--ink);background:var(--faint);padding:1px 6px;border-radius:5px;font-size:11px;font-family:ui-monospace,Menlo,monospace}
+.meta{display:flex;gap:18px;color:var(--sub);font-size:11px;margin-top:12px;flex-wrap:wrap;letter-spacing:.02em}
+.meta b{color:var(--ink);font-weight:600}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--sub);margin:30px 0 12px}
+.dash{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--hair);border-radius:14px;overflow:hidden}
+.dash .cell{padding:20px 22px;border-right:1px solid var(--hair)}
+.dash .cell:last-child{border-right:0}
+.dash .num{font-size:38px;font-weight:770;letter-spacing:-.03em;line-height:1}
+.dash .num.red{color:var(--red)}.dash .num.amber{color:var(--amber)}.dash .num.grey{color:var(--sub)}
+.dash .lbl{font-size:10.5px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-top:8px}
+.noscore{text-align:right;color:var(--sub);font-size:10px;margin-top:6px;font-style:italic}
+table.matrix{width:100%;border-collapse:collapse;margin-top:4px;font-size:11.5px}
+table.matrix th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);font-weight:650;text-align:center;padding:8px 6px;border-bottom:1px solid var(--hair)}
+table.matrix th.l,table.matrix td.l{text-align:left}
+table.matrix td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--hair)}
+table.matrix td.l{font-weight:600}
+table.matrix tr:last-child td{border-bottom:0}
+.m{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;font-size:11px;font-weight:700}
+.m.ok{color:var(--green);background:var(--greenbg)}.m.bad{color:var(--red);background:var(--redbg)}.m.warn{color:var(--amber);background:var(--amberbg)}
+.callout{display:flex;gap:11px;align-items:flex-start;border:1px solid #f3c8c8;background:var(--redbg);border-radius:12px;padding:13px 15px;margin-top:14px}
+.callout .badge{flex:none;font-size:9.5px;font-weight:750;letter-spacing:.06em;color:#fff;background:var(--red);padding:3px 8px;border-radius:6px;margin-top:1px}
+.callout .body{font-size:11.5px;line-height:1.5}
+.callout code{background:#fff;border:1px solid #f1d4d4;padding:.5px 5px;border-radius:4px;font-size:10.5px;font-family:ui-monospace,Menlo,monospace}
+.state{border:1px solid var(--hair);border-radius:16px;padding:24px 26px;margin-top:20px;page-break-inside:avoid}
+.state .head{display:flex;align-items:center;gap:13px;margin-bottom:4px}
+.state .idx{font-size:11px;font-weight:750;color:#fff;background:var(--accent);width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.state h2{font-size:16px;font-weight:700;letter-spacing:-.015em}
+.state .node{font-size:10.5px;color:var(--sub);font-family:ui-monospace,Menlo,monospace;background:var(--faint);padding:2px 7px;border-radius:6px}
+.state .reach{color:var(--sub);font-size:10.5px;margin:2px 0 0 39px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px 0}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:650;padding:4px 10px;border-radius:9999px;border:1px solid var(--hair)}
+.pill .d{font-weight:800}.pill.ok{color:var(--green)}.pill.bad{color:var(--red);background:var(--redbg);border-color:#f6d6d6}.pill.warn{color:var(--amber);background:var(--amberbg);border-color:#f3e2bf}
+.imgs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.imgs figure{margin:0;border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--faint)}
+.imgs img{width:100%;display:block;max-height:430px;object-fit:cover;object-position:top}
+.imgs figcaption{font-size:10px;color:var(--sub);padding:7px 10px;border-top:1px solid var(--hair);letter-spacing:.03em}
+.grp{margin-top:14px}
+.grp .gh{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}
+.grp .gh .cnt{color:var(--sub);font-weight:600;letter-spacing:0}
+.find{display:flex;gap:11px;padding:11px 13px;border:1px solid var(--hair);border-radius:10px;margin-bottom:7px;background:#fff}
+.find.must{border-left:3px solid var(--red)}.find.should{border-left:3px solid var(--amber)}.find.ok{border-left:3px solid var(--green)}
+.find .stag{flex:none;font-size:9px;font-weight:750;letter-spacing:.05em;padding:3px 7px;border-radius:6px;height:fit-content;margin-top:1px}
+.find.must .stag{color:var(--red);background:var(--redbg)}.find.should .stag{color:var(--amber);background:var(--amberbg)}.find.ok .stag{color:var(--green);background:var(--greenbg)}
+.find .ftxt{font-size:11.5px;line-height:1.5}.find .cat{font-weight:700}
+.find .cite{color:var(--sub);font-size:10px;margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.cantalign{border:1px dashed var(--hair);border-radius:14px;padding:18px 22px;margin-top:22px}
+.cantalign li{list-style:none;font-size:11px;color:#3f3f46;padding:6px 0 6px 18px;position:relative;border-bottom:1px solid var(--faint)}
+.cantalign li:last-child{border-bottom:0}
+.cantalign li:before{content:"–";position:absolute;left:0;color:var(--sub)}
+.foot{margin-top:30px;padding-top:13px;border-top:1px solid var(--hair);color:var(--sub);font-size:9.5px;line-height:1.6}
+</style></head><body><div class="page">
+
+  <div class="tick"></div>
+  <h1>Design-match report</h1>
+  <div class="lede"><code>{{ROUTE}}</code> &nbsp;↔&nbsp; {{FIGMA_FILE_TITLE}}</div>
+  <div class="meta">
+    <span><b>Breakpoint</b> {{WIDTH}}px</span><span><b>States</b> {{STATE_COUNT}}</span>
+    <span><b>Section</b> {{SECTION_NODE}}</span><span><b>Date</b> {{DATE}}</span>
+    <span><b>Mode</b> read-only · client-side</span>
+  </div>
+
+  <div class="eyebrow">Summary</div>
+  <div class="dash">
+    <div class="cell"><div class="num red">{{MUST}}</div><div class="lbl">Must-fix</div></div>
+    <div class="cell"><div class="num amber">{{SHOULD}}</div><div class="lbl">Should-fix</div></div>
+    <div class="cell"><div class="num grey">{{CANT_ALIGN}}</div><div class="lbl">Couldn't align</div></div>
+  </div>
+  <div class="noscore">no overall match score — status is per-category ✓ / ⚠ / ✗</div>
+
+  <div class="eyebrow">Per-state verdict</div>
+  <table class="matrix">
+    <thead><tr><th class="l">State</th><th>Color</th><th>Type</th><th>Spacing</th><th>Layout</th><th>Sizing</th></tr></thead>
+    <tbody>
+      <!-- one row per state · glyph span: <span class="m ok">✓</span> / <span class="m warn">⚠</span> / <span class="m bad">✗</span> -->
+      <tr><td class="l">{{STATE_SHORT}}</td><td>{{C}}</td><td>{{T}}</td><td>{{S}}</td><td>{{L}}</td><td>{{Z}}</td></tr>
+    </tbody>
+  </table>
+
+  <!-- OPTIONAL: a global finding that applies to every state -->
+  <div class="callout"><span class="badge">GLOBAL</span><div class="body">{{GLOBAL_FINDING}}</div></div>
+
+  <div class="eyebrow">States</div>
+
+  <!-- ===== repeat one .state block per mapped state ===== -->
+  <section class="state">
+    <div class="head"><div class="idx">{{NN}}</div><h2>{{STATE_TITLE}}</h2><span class="node">{{NODE_ID}}</span></div>
+    <div class="reach">reach · {{INTERACTION_RECIPE}}</div>
+    <!-- OPTIONAL grey note for intended-behaviour states:
+    <div class="callout" style="border-color:var(--hair);background:var(--faint)"><span class="badge" style="background:#52525b">NOTE</span><div class="body">{{NOTE}}</div></div> -->
+    <div class="pills">
+      <span class="pill ok"><span class="d">✓</span>Color</span>
+      <span class="pill bad"><span class="d">✗</span>Type</span>
+      <span class="pill ok"><span class="d">✓</span>Spacing</span>
+      <span class="pill warn"><span class="d">⚠</span>Layout</span>
+      <span class="pill ok"><span class="d">✓</span>Sizing</span>
+    </div>
+    <div class="imgs">
+      <figure><img src="{{LIVE_IMG_DATA_URI}}"><figcaption>LIVE · {{LIVE_CAPTION}}</figcaption></figure>
+      <figure><img src="{{FIGMA_IMG_DATA_URI}}"><figcaption>FIGMA · {{FIGMA_CAPTION}}</figcaption></figure>
+    </div>
+    <!-- group findings by severity: must → should → ok. Omit empty groups. -->
+    <div class="grp"><div class="gh">Must-fix <span class="cnt">· {{N}}</span></div>
+      <div class="find must"><span class="stag">✗ {{CATEGORY}}</span><div><div class="ftxt">{{FINDING}}</div><div class="cite">{{ELEMENT · NODE · LIVE vs FIGMA · DELTA · TOLERANCE/SOURCE}}</div></div></div>
+    </div>
+    <div class="grp"><div class="gh">Should-fix <span class="cnt">· {{N}}</span></div>
+      <div class="find should"><span class="stag">⚠ {{CATEGORY}}</span><div><div class="ftxt">{{FINDING}}</div><div class="cite">{{CITATION}}</div></div></div>
+    </div>
+    <div class="grp"><div class="gh">Within tolerance <span class="cnt">· {{N}}</span></div>
+      <div class="find ok"><span class="stag">✓ {{CATEGORY}}</span><div><div class="ftxt">{{WHAT MATCHED}}</div><div class="cite">{{CITATION}}</div></div></div>
+    </div>
+  </section>
+  <!-- ===== end .state ===== -->
+
+  <div class="eyebrow">Couldn't align</div>
+  <ul class="cantalign">
+    <li>{{UNMATCHED OR OUT-OF-SCOPE ITEM, with why it wasn't paired}}</li>
+  </ul>
+
+  <div class="foot">{{TOOLING / METHOD / TOLERANCE NOTE — e.g. Generated by verify-design-match (read-only, multi-state); Playwright + Figma MCP read tools; colors oklch→hex; tolerances per parity-check-catalog.md.}}</div>
+
+</div></body></html>
