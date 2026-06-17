@@ -112,7 +112,7 @@ After installing, restart Claude Code (or run `/doctor`) so it discovers the new
 
 ## Usage
 
-Most skills trigger automatically from natural language — you generally don't need to name them. The **command-only** skills (`/harden-doc`, `/biz-review`, `/critique-figma-design`) never auto-trigger; you invoke them explicitly so they don't fire uninvited.
+Most skills trigger automatically from natural language — you generally don't need to name them. The **command-only** skills (`/harden-doc`, `/biz-review`, `/critique-figma-design`, `/verify-design-match`) never auto-trigger; you invoke them explicitly so they don't fire uninvited.
 
 **Model-invocable (trigger from a request):**
 
@@ -141,6 +141,9 @@ Most skills trigger automatically from natural language — you generally don't 
 
 - **Objective self-check of a Figma frame:**
   > `/critique-figma-design` *(with the frame selected / linked)*
+
+- **Check a running page matches its Figma design:**
+  > `/verify-design-match` *(with the page URL/route and the Figma frame(s) it should match)*
 
 - **Stress-test a plan or spec until every branch is resolved:**
   > `/harden-doc docs/specs/pos-spec.md`
