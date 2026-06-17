@@ -62,13 +62,17 @@ contains() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && 
 installed_version() { [ -f "$MANIFEST" ] && (grep '^version=' "$MANIFEST" 2>/dev/null | head -1 | cut -d= -f2-) || true; }
 
 # --- locate the skills/ source ---------------------------------------------
-# Use the local checkout if this script sits next to a skills/ dir; otherwise
-# download a tarball of the repo and use the skills/ dir inside it.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# Use the local checkout only when this script is a real FILE sitting next to a
+# skills/ dir; otherwise download a tarball of the repo and use the skills/ dir
+# inside it. When piped (curl … | bash) there is no script file — BASH_SOURCE[0]
+# resolves to the CWD — so we must NOT treat a skills/ dir that merely happens to
+# be in the current directory as the source; force remote in that case.
+SELF="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR="$(cd "$(dirname "${SELF:-$0}")" && pwd)"
 CLEANUP=""
 trap '[ -n "$CLEANUP" ] && rm -rf "$CLEANUP"' EXIT
 
-if [ -d "${SCRIPT_DIR}/skills" ]; then
+if [ -f "$SELF" ] && [ -d "${SCRIPT_DIR}/skills" ]; then
   SRC="${SCRIPT_DIR}/skills"
   MODE="local"
 else
