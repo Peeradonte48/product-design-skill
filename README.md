@@ -74,7 +74,7 @@ Ten skills across four groups. Most go **design/flow → code or doc**; `page-to
 ### Option A — one-liner (no clone)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Peeradonte48/FIGMA-IMPLEMENT/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
 ```
 
 Installs all ten skills into your user skills directory, `~/.claude/skills/`.
@@ -82,8 +82,8 @@ Installs all ten skills into your user skills directory, `~/.claude/skills/`.
 ### Option B — clone and run the installer
 
 ```bash
-git clone https://github.com/Peeradonte48/FIGMA-IMPLEMENT.git
-cd FIGMA-IMPLEMENT
+git clone https://github.com/Peeradonte48/product-design-skill.git
+cd product-design-skill
 ./install.sh                 # user-level   → ~/.claude/skills
 ./install.sh --project       # project-only → ./.claude/skills (run from your project root)
 ./install.sh --dir <path>    # custom skills directory

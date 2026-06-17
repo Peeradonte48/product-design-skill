@@ -10,11 +10,11 @@
 #   ./install.sh --uninstall     # remove the ten skills from the target
 #
 # Remote one-liner (no clone needed):
-#   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/FIGMA-IMPLEMENT/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
 #
 set -euo pipefail
 
-REPO="Peeradonte48/FIGMA-IMPLEMENT"
+REPO="Peeradonte48/product-design-skill"
 BRANCH="main"
 TARBALL="https://codeload.github.com/${REPO}/tar.gz/refs/heads/${BRANCH}"
 SKILLS=(
