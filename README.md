@@ -2,13 +2,13 @@
 
 A portable, **stack-agnostic** set of [Claude Code](https://claude.com/claude-code) skills that turn Figma, FigJam, and plain product docs into narratives, specs, prototypes, and pixel-perfect builds — in either direction across the design/code boundary. They detect and conform to whatever project you run them against — no hardcoded framework, design system, or domain. Every Figma/FigJam skill follows one rule: **clarify until clear** — it stops and asks rather than inventing a missing detail.
 
-This repo is a **skill-only scaffold**. There is no application code, no build step, and nothing to compile — just the ten skills under [`skills/`](skills/) and an installer.
+This repo is a **skill-only scaffold**. There is no application code, no build step, and nothing to compile — just the eleven skills under [`skills/`](skills/) and an installer.
 
 ---
 
 ## Skills overview
 
-Ten skills across four groups. Most go **design/flow → code or doc**; `page-to-figma` is the one that runs the other way (running page → Figma).
+Eleven skills across four groups. Most go **design/flow → code or doc**; `page-to-figma` is the one that runs the other way (running page → Figma).
 
 ### 1. The pipeline — FigJam → narrative → prototype
 
@@ -31,6 +31,7 @@ Ten skills across four groups. Most go **design/flow → code or doc**; `page-to
 | **[figjam-sitemap-to-spec](skills/figjam-sitemap-to-spec/SKILL.md)** | FigJam → spec | Reads a sitemap / site-structure diagram from FigJam and writes a **product spec** markdown doc (sitemap tree + per-page specs). Read-only; composes with the doc skills and build skills. |
 | **[page-to-figma](skills/page-to-figma/SKILL.md)** | running page → Figma | Transcribes a **running** product page into a 1:1 Figma frame. Extracts live-DOM computed styles as ground truth, delegates the build to the official Figma plugin, then gates on a **numeric property read-back** — correcting until every value matches. *(Requires the official Figma plugin.)* |
 | **[critique-figma-design](skills/critique-figma-design/SKILL.md)** | Figma frame → critique *(command-only)* | A **read-only** self-check that runs a finished Figma frame through an objective checklist and returns a severity-ranked report: four **measured** categories (accessibility, design-system consistency, structure/hierarchy, layer hygiene — each finding citing value · threshold · source) plus an evidence-anchored **Nielsen-10 heuristic** pass. A self-check, not a taste-maker — no aesthetic preference, no quality score. Runs only when you type `/critique-figma-design`. |
+| **[verify-design-match](skills/verify-design-match/SKILL.md)** | running page ↔ Figma *(command-only)* | A **read-only** parity audit: compares a running page against the finished Figma frame(s) it should match and reports, **per breakpoint**, where the implementation diverges — changing nothing. Visual pass (screenshot overlay) locates regions; property pass (measured DOM-vs-Figma diff) quantifies them; matching is geometry-first/text-anchored with a "couldn't align" gap list. Output is a per-category ✓/⚠/✗ verdict + cited findings, **no overall score**. Runs only when you type `/verify-design-match`. *(Requires Playwright + Figma access.)* |
 
 ### 4. Doc skills — no Figma required
 
@@ -51,6 +52,7 @@ Ten skills across four groups. Most go **design/flow → code or doc**; `page-to
   FigJam sitemap   ──▶  figjam-sitemap-to-spec  ──▶  product-spec.md
   Running page     ──▶  page-to-figma  ──▶  pixel-perfect Figma frame
   Finished frame   ──▶  /critique-figma-design  ──▶  severity-ranked self-check (read-only)
+  Running page+Figma──▶  /verify-design-match  ──▶  per-breakpoint parity report (read-only)
   Any plan/spec    ──▶  /biz-review  ──▶  /harden-doc  ──▶  spec-to-brief  ──▶  stakeholder brief
 ```
 
@@ -64,6 +66,7 @@ Ten skills across four groups. Most go **design/flow → code or doc**; `page-to
 - The **Figma MCP server** connected, so the skills can read from Figma/FigJam. The skills use the read tools `get_design_context`, `get_screenshot`, `get_metadata`, `get_variable_defs`, and `get_figjam`. To connect it, see Figma's [Guide to the Figma MCP server](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server) and the [developer docs](https://developers.figma.com/docs/figma-mcp-server/). These are the current, unified tool names (local Dev Mode server **and** the hosted connector). An **outdated** Figma desktop install may still expose the legacy names `get_code` / `get_image` — if a skill reports "tool not found" on step 1, update Figma.
 - For `page-to-figma` only: the **official Figma plugin** must be installed (it provides the `figma-use` and `figma-generate-design` skills this one supervises) and the write tools `use_figma` / `generate_figma_design` must be available. This is the one suite skill with a hard dependency beyond the MCP read tools — see [docs/adr/0001-page-to-figma-depends-on-official-figma-plugin.md](docs/adr/0001-page-to-figma-depends-on-official-figma-plugin.md).
 - For `figma-design-to-working-prototype`: needs the Figma MCP read tools **transitively** through the two siblings it orchestrates (`use-case-narrative-to-prototype` + `implement-figma-design`) — see [docs/adr/0002-p1-composes-sibling-suite-skills.md](docs/adr/0002-p1-composes-sibling-suite-skills.md).
+- For `verify-design-match`: a **hard, fail-closed** dependency on **both** browser automation (Playwright **MCP or CLI**) **and** Figma access (Figma **MCP read tools or REST API + token**). The skill stops with setup instructions if either is missing — see [docs/adr/0003-verify-design-match-requires-playwright-and-figma-access.md](docs/adr/0003-verify-design-match-requires-playwright-and-figma-access.md).
 - For screenshot-based verification in `implement-figma-design` (and walkable verification in the prototype skills): any browser/screenshot tooling available in your project (e.g. Playwright).
 - `harden-doc`, `biz-review`, and `spec-to-brief` need **no Figma connection at all** — they operate on markdown documents and plans. `biz-review` and `spec-to-brief` can optionally use web search / the `deep-research` plugin for the landscape check.
 
@@ -77,7 +80,7 @@ Ten skills across four groups. Most go **design/flow → code or doc**; `page-to
 curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
 ```
 
-Installs all ten skills into your user skills directory, `~/.claude/skills/`.
+Installs all eleven skills into your user skills directory, `~/.claude/skills/`.
 
 ### Option B — clone and run the installer
 
@@ -88,12 +91,12 @@ cd product-design-skill
 ./install.sh --project       # project-only → ./.claude/skills (run from your project root)
 ./install.sh --dir <path>    # custom skills directory
 ./install.sh --force         # overwrite existing copies without prompting
-./install.sh --uninstall     # remove the ten skills
+./install.sh --uninstall     # remove the eleven skills
 ```
 
 ### Option C — copy by hand
 
-Each skill is a self-contained folder. Copy the ten directories under [`skills/`](skills/) into any skills directory Claude Code reads:
+Each skill is a self-contained folder. Copy the eleven directories under [`skills/`](skills/) into any skills directory Claude Code reads:
 
 ```bash
 cp -R skills/* ~/.claude/skills/        # user-level
@@ -237,6 +240,10 @@ skills/
 │   ├── SKILL.md                             # read-only Figma self-check (/critique-figma-design)
 │   └── references/
 │       └── check-catalog.md                 # measured checks + thresholds + Nielsen-10 catalog
+├── verify-design-match/
+│   ├── SKILL.md                             # read-only live↔Figma parity audit (/verify-design-match)
+│   └── references/
+│       └── parity-check-catalog.md          # categories, tolerances, matching algorithm, report template
 ├── harden-doc/
 │   └── SKILL.md                             # doc command: resolve every decision branch (/harden-doc)
 ├── biz-review/

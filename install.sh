@@ -7,7 +7,7 @@
 #   ./install.sh --project       # install into ./.claude/skills (this project only)
 #   ./install.sh --dir <path>    # install into a custom skills directory
 #   ./install.sh --force         # overwrite existing skills without prompting
-#   ./install.sh --uninstall     # remove the ten skills from the target
+#   ./install.sh --uninstall     # remove the eleven skills from the target
 #
 # Remote one-liner (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
@@ -25,6 +25,7 @@ SKILLS=(
   "figjam-sitemap-to-spec"
   "page-to-figma"
   "critique-figma-design"
+  "verify-design-match"
   "harden-doc"
   "biz-review"
   "spec-to-brief"
@@ -110,4 +111,4 @@ echo "Done. Restart Claude Code (or run /doctor) so it picks up the new skills."
 echo "Invoke a skill by sharing a Figma/FigJam link, or type its name, e.g.:"
 echo "  implement-figma-design  •  figjam-to-use-case-narrative  •  use-case-narrative-to-prototype"
 echo "  figma-design-to-working-prototype  •  figjam-sitemap-to-spec  •  page-to-figma  •  spec-to-brief"
-echo "Run the command-only skills:  /critique-figma-design  •  /harden-doc <doc>  •  /biz-review <doc>"
+echo "Run the command-only skills:  /critique-figma-design  •  /verify-design-match  •  /harden-doc <doc>  •  /biz-review <doc>"
