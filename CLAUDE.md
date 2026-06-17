@@ -38,6 +38,10 @@ The eleven skills form a **FigJam → narrative → prototype** pipeline, plus a
 
 Both `figjam-to-use-case-narrative` and `use-case-narrative-to-prototype` carry an identical copy of `references/use-case-narrative-format.md` (the canonical UCN template — one skill writes it, the other reads it). These two copies are a shared contract: **when you edit one, edit the other to match.** Each skill also has a one-directional mapping reference (`references/figjam-mapping.md` and `references/prototype-mapping.md` respectively).
 
+## Distribution & versioning
+
+The suite is distributed **curl | bash only** via `install.sh` (npm and the Claude Code plugin marketplace were deliberately declined — don't reintroduce them unasked). The repo-root [`VERSION`](VERSION) file is the suite's single version of record: `install.sh` stamps it into a `~/.claude/skills/.product-design-skill.version` manifest, and `--update` / `--check` read it so already-installed users can update easily. **Bump `VERSION` whenever you change shipped skill content** (anything under `skills/`) — otherwise `--check` will tell users they're current when they aren't. Docs-only changes (README/CLAUDE.md/ADRs) don't need a bump.
+
 ## Conventions when editing these skills
 
 - **Stay stack-agnostic.** Skills detect the target project's framework, file structure, component patterns, styling, and token system and conform to them. Don't bake in a specific stack, design system, or domain.
