@@ -71,6 +71,12 @@ weight / line-height, and which design tokens map to which element. If a value i
 ambiguous between two tools, trust `get_metadata` for geometry and `get_variable_defs`
 for tokens — and if it's still unclear, ask the user rather than averaging a guess.
 
+**Write the design spec before building.** Persist what you captured to a `design-spec.md` — the
+canonical ground truth the build reads from, not your memory of the frame. Follow
+[`references/design-spec-format.md`](references/design-spec-format.md) for the exact columns, the
+`design-spec-<node-id>.md` naming, where to write it, and the `## Gaps` rules (Blocking vs Noted).
+Report the path back to the user.
+
 ### 2. Map Figma tokens to this project's system
 
 Read the design's tokens with `get_variable_defs`, then map them onto **whatever
@@ -80,6 +86,10 @@ raw hex or px value, check whether an existing project token already represents 
 prefer that token so the build stays consistent with the rest of the app. Only fall back
 to a raw value when no token matches — and flag that gap to the user.
 
+Record the resulting mapping **into `design-spec.md`**: the `color`/`type` columns carry the
+mapped token, with a raw value only where none matches — and every no-match goes to
+`## Gaps → Noted`.
+
 If the project has its own accessibility or ergonomics conventions (minimum touch-target
 sizes, minimum body font, contrast rules), honor them while matching the design. If the
 Figma appears to violate a convention the project enforces, surface it rather than
@@ -87,9 +97,11 @@ silently shipping a control that breaks the rule.
 
 ### 3. Build it
 
-Implement with the target project's existing stack and conventions — match the framework,
-file structure, component patterns, and styling approach already in the repo rather than
-introducing new ones. Reuse existing components where the design calls for something the
+Build **from `design-spec.md`** (not a re-read of the frame). First resolve every
+`## Gaps → Blocking` item with the user — do not start until they're cleared; carry
+`## Gaps → Noted` items as flagged raw values. Implement with the target project's existing stack
+and conventions — match the framework, file structure, component patterns, and styling approach
+already in the repo rather than introducing new ones. Reuse existing components where the design calls for something the
 codebase already has; don't reinvent a button that already exists.
 
 **No codebase yet?** A pure designer often has no target repo — that is expected, not a
@@ -113,26 +125,32 @@ width and you're unsure how it should reflow, ask.
 
 ### 4. Verify the match — this is the part people skip
 
-Render your build and compare it side-by-side against the `get_screenshot` reference
-from step 1. Screenshot your running UI with whatever browser/screenshot tooling the
-project already has available, then diff it against the Figma image.
+Verification has one **oracle: the Figma `get_screenshot` from step 1** — the actual design image,
+not your `design-spec.md`. The spec is derived; trusting it as the source of truth would launder
+any extraction error. Render your build, screenshot the running UI with whatever browser/screenshot
+tooling the project has, and do both passes:
 
-**If the project has no browser/screenshot tooling, do not eyeball your own code and
-call it a match.** That silently breaks the one promise this skill makes. Instead, say so
-and offer to set up a headless browser (e.g. Playwright) to capture the screenshot, or
-stop and tell the user the build is **unverified**. Never report a 1:1 / pixel-perfect
-match you did not actually compare against a rendered screenshot.
+- **Pixel diff** — compare the live screenshot against the Figma `get_screenshot`. This is the
+  oracle.
+- **Property walk** — check each element's `design-spec.md` values against the live computed
+  values: colors (hex/token, incl. hovers and states), dimensions (width, height, padding, margins,
+  gaps), border-radius / borders / shadows, typography (family, size, weight, line-height,
+  letter-spacing), icons & images (correct asset, size, position).
 
-When you can capture the screenshot, walk through each property deliberately:
+If the pixel diff and the spec disagree, the **spec (extraction) was wrong** — fix the spec *and*
+the build; never hide it. Report results as an **inline per-element ✓/Δ summary** in your response,
+category by category, and surface any `## Gaps → Noted` items there too. Iterate until it's a 100%
+match; don't declare done after one pass.
 
-- Colors — exact hex / token, including hovers and states.
-- Dimensions — width, height, padding, margins, gaps.
-- Border-radius, borders, shadows.
-- Typography — family, size, weight, line-height, letter-spacing.
-- Icons and images — correct asset, size, and position.
+**This skill writes no report file.** The inline summary is the whole output here — a formal,
+shareable parity report (PDF / machine-readable findings) is `verify-design-match`'s job, not this
+skill's; point the user there if they want one.
 
-If anything is off, fix it and re-verify. Iterate until it's a 100% match. Don't declare
-done after one pass — confirm with an actual comparison and report what you checked.
+**If the project has no browser/screenshot tooling, do not eyeball your own code and call it a
+match.** That silently breaks the one promise this skill makes. Say so and offer to set up a
+headless browser (e.g. Playwright) to capture the screenshot, or stop and tell the user the build
+is **unverified**. Never report a 1:1 / pixel-perfect match you did not actually compare against a
+rendered screenshot.
 
 ## When to stop and ask
 
@@ -144,6 +162,9 @@ and keep asking until the answer is unambiguous.
 
 ## Helpful resources
 
+- **Reference:** [`references/design-spec-format.md`](references/design-spec-format.md) — the
+  `design-spec.md` artifact (columns, `design-spec-<node-id>.md` naming, placement, and the
+  `## Gaps` Blocking/Noted rules) you write in step 1 and build from.
 - **MCP:** the Figma plugin read tools are the only dependency — `get_design_context`,
   `get_screenshot`, `get_metadata`, `get_variable_defs`. These are the current, unified
   tool names. If a call returns "tool not found," the connected Figma MCP is outdated and
