@@ -44,6 +44,24 @@ Read the frame/section with `get_metadata`, `get_design_context`, `get_screensho
 `get_variable_defs`. Build an internal inventory: screens (frames), components, on-screen copy,
 visible states, and design tokens. **Auto-detect** frame (one screen) vs section (many frames).
 
+**Read small text at the right resolution — never transcribe labels from a zoomed-out
+thumbnail.** A full-frame screenshot of a tall screen is downscaled so far that small labels
+(field names, option-card text, helper copy) are easy to misread, and a confident misread silently
+corrupts the spec. Before you commit any label to a requirement, confirm it against a source that
+shows it at full size: `get_design_context` text nodes, `get_variable_defs`, or a **`get_screenshot`
+of the specific sub-node/section** (not the whole frame). Component-*instance* text often isn't
+exposed in `get_design_context` — for those, screenshot the sub-node and read the crop. When the
+exact wording still isn't legible, ask rather than guess.
+
+**Flag, don't silently fix, source-copy issues.** If the design's own copy has a typo or
+inconsistency (e.g. a misspelled label), record it as an observation and route it to
+`/critique-figma-design` — do not quietly "correct" it in the docs without noting you did, and never
+invent copy the design doesn't contain.
+
+**Don't assert behavior a static frame can't prove.** Layout-implied behaviors (sticky panels,
+scroll, hover, transitions) are inferences — mark them assumed (or ask in the interview), the same
+way unknowns go to Open Questions.
+
 **Scope floor:** if the input is clearly a **sub-component** (a single button, a card) rather than a
 screen or feature, flag it ("this looks like a component, not a screen") and ask whether to point at
 the parent screen/section, proceed at component granularity anyway, or stop. Never silently emit a
