@@ -261,7 +261,9 @@ You can also invoke any skill explicitly by name, e.g. *"use the use-case-narrat
 ```
 skills/
 ├── implement-figma-design/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── references/
+│       └── design-spec-format.md          # single-owner: design-spec.md columns + Gaps rules
 ├── figjam-to-use-case-narrative/
 │   ├── SKILL.md
 │   └── references/
