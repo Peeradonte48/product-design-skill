@@ -74,7 +74,7 @@ for tokens — and if it's still unclear, ask the user rather than averaging a g
 **Write the design spec before building.** Persist what you captured to a `design-spec.md` — the
 canonical ground truth the build reads from, not your memory of the frame. Follow
 [`references/design-spec-format.md`](references/design-spec-format.md) for the exact columns, the
-`design-spec-<node-id>.md` naming, where to write it, and the `## Gaps` rules (Blocking vs Noted).
+`design-spec-<sanitized-node-id>.md` naming, where to write it, and the `## Gaps` rules (Blocking vs Noted).
 Report the path back to the user.
 
 ### 2. Map Figma tokens to this project's system
@@ -101,7 +101,8 @@ Build **from `design-spec.md`** (not a re-read of the frame). First resolve ever
 `## Gaps → Blocking` item with the user — do not start until they're cleared; carry
 `## Gaps → Noted` items as flagged raw values. Implement with the target project's existing stack
 and conventions — match the framework, file structure, component patterns, and styling approach
-already in the repo rather than introducing new ones. Reuse existing components where the design calls for something the
+already in the repo rather than introducing new ones.
+Reuse existing components where the design calls for something the
 codebase already has; don't reinvent a button that already exists.
 
 **No codebase yet?** A pure designer often has no target repo — that is expected, not a
@@ -163,7 +164,7 @@ and keep asking until the answer is unambiguous.
 ## Helpful resources
 
 - **Reference:** [`references/design-spec-format.md`](references/design-spec-format.md) — the
-  `design-spec.md` artifact (columns, `design-spec-<node-id>.md` naming, placement, and the
+  `design-spec.md` artifact (columns, `design-spec-<sanitized-node-id>.md` naming, placement, and the
   `## Gaps` Blocking/Noted rules) you write in step 1 and build from.
 - **MCP:** the Figma plugin read tools are the only dependency — `get_design_context`,
   `get_screenshot`, `get_metadata`, `get_variable_defs`. These are the current, unified
