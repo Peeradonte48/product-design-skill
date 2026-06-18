@@ -2,13 +2,13 @@
 
 A portable, **stack-agnostic** set of [Claude Code](https://claude.com/claude-code) skills that turn Figma, FigJam, and plain product docs into narratives, specs, prototypes, and pixel-perfect builds — in either direction across the design/code boundary. They detect and conform to whatever project you run them against — no hardcoded framework, design system, or domain. Every Figma/FigJam skill follows one rule: **clarify until clear** — it stops and asks rather than inventing a missing detail.
 
-This repo is a **skill-only scaffold**. There is no application code, no build step, and nothing to compile — just the eleven skills under [`skills/`](skills/) and an installer.
+This repo is a **skill-only scaffold**. There is no application code, no build step, and nothing to compile — just the twelve skills under [`skills/`](skills/) and an installer.
 
 ---
 
 ## Skills overview
 
-Eleven skills across four groups. Most go **design/flow → code or doc**; `page-to-figma` is the one that runs the other way (running page → Figma).
+Twelve skills across four groups. Most go **design/flow → code or doc**; `page-to-figma` is the one that runs the other way (running page → Figma).
 
 ### 1. The pipeline — FigJam → narrative → prototype
 
@@ -32,6 +32,7 @@ Eleven skills across four groups. Most go **design/flow → code or doc**; `page
 | **[page-to-figma](skills/page-to-figma/SKILL.md)** | running page → Figma | Transcribes a **running** product page into a 1:1 Figma frame. Extracts live-DOM computed styles as ground truth, delegates the build to the official Figma plugin, then gates on a **numeric property read-back** — correcting until every value matches. *(Requires the official Figma plugin.)* |
 | **[critique-figma-design](skills/critique-figma-design/SKILL.md)** | Figma frame → critique *(command-only)* | A **read-only** self-check that runs a finished Figma frame through an objective checklist and returns a severity-ranked report: four **measured** categories (accessibility, design-system consistency, structure/hierarchy, layer hygiene — each finding citing value · threshold · source) plus an evidence-anchored **Nielsen-10 heuristic** pass. A self-check, not a taste-maker — no aesthetic preference, no quality score. Runs only when you type `/critique-figma-design`. |
 | **[verify-design-match](skills/verify-design-match/SKILL.md)** | running page ↔ Figma frame/section *(command-only)* | A **read-only** parity audit: compares a running page against the finished Figma frame(s) — **or a whole section of state-variant frames** — and reports, **per breakpoint and per state**, where the implementation diverges. Read-only on code & Figma; may drive the live app to reach states **only with your authorization**. Section inputs are **auto-matched then ask-the-gaps** (you supply the route + interaction recipe for states it can't reach). Visual pass locates regions; property pass quantifies them; matching is geometry-first/text-anchored with a "couldn't align" gap list. Output is a per-category ✓/⚠/✗ verdict + cited findings, **no overall score**, emitted as **both a PDF and an AI-agent Markdown handoff** (feeds `implement-figma-design`). Runs only when you type `/verify-design-match`. *(Requires Playwright + Figma access.)* |
+| **[figma-to-dev-docs](skills/figma-to-dev-docs/SKILL.md)** | Figma frame/section → dev docs *(command-only)* | A **read-only** skill that turns a finished Figma frame or section into a bundle of AI-developer docs — a **developer-facing PRD**, a spec-driven `spec.md` (EARS requirements + design + tasks), and Gherkin `test-cases.md` — after a batched **context interview** for the behavior a static design can't show. Never writes to Figma, never builds code (that's `implement-figma-design`); its PRD is build context, not a buy-in brief (that's `spec-to-brief`). Keeps a **REQ → task → test** traceability chain. Runs only when you type `/figma-to-dev-docs`. |
 
 ### 4. Doc skills — no Figma required
 
@@ -52,6 +53,7 @@ Eleven skills across four groups. Most go **design/flow → code or doc**; `page
   FigJam sitemap   ──▶  figjam-sitemap-to-spec  ──▶  product-spec.md
   Running page     ──▶  page-to-figma  ──▶  pixel-perfect Figma frame
   Finished frame   ──▶  /critique-figma-design  ──▶  severity-ranked self-check (read-only)
+  Finished frame   ──▶  /figma-to-dev-docs  ──▶  PRD.md + spec.md + test-cases.md (read-only)
   Running page+Figma──▶  /verify-design-match  ──▶  per-state parity report: PDF + AI-agent MD (read-only)
   Any plan/spec    ──▶  /biz-review  ──▶  /harden-doc  ──▶  spec-to-brief  ──▶  stakeholder brief
 ```
@@ -84,6 +86,7 @@ This suite is built for **Claude Code**, not the claude.ai chat interface. Most 
 | **figjam-to-use-case-narrative** | 🟡 Degraded | Needs the Figma read connector; read-only so plausible |
 | **figjam-sitemap-to-spec** | 🟡 Degraded | Same — Figma read connector only |
 | **critique-figma-design** | 🟡 Degraded | Figma read works, but screenshot/pixel-sampling steps are unreliable in-sandbox |
+| **figma-to-dev-docs** | 🟡 Degraded | Figma read works; repo-grounding for Design/Tasks is unavailable in-sandbox |
 | **implement-figma-design** | ❌ No | Writes code into *your* repo + screenshots *your* running UI |
 | **use-case-narrative-to-prototype** | ❌ No | Builds a runnable prototype in your project |
 | **figma-design-to-working-prototype** | ❌ No | Orchestrates the two above |
@@ -104,7 +107,7 @@ The cleanly portable set is the **three no-Figma doc skills** (`harden-doc`, `bi
 curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
 ```
 
-Installs all eleven skills into your user skills directory, `~/.claude/skills/`.
+Installs all twelve skills into your user skills directory, `~/.claude/skills/`.
 
 ### Option B — clone and run the installer
 
@@ -117,12 +120,12 @@ cd product-design-skill
 ./install.sh --update        # update installed skills to the latest (no prompts)
 ./install.sh --check         # report installed vs latest version, then exit
 ./install.sh --force         # overwrite existing copies without prompting
-./install.sh --uninstall     # remove the eleven skills
+./install.sh --uninstall     # remove the twelve skills
 ```
 
 ### Option C — copy by hand
 
-Each skill is a self-contained folder. Copy the eleven directories under [`skills/`](skills/) into any skills directory Claude Code reads:
+Each skill is a self-contained folder. Copy the twelve directories under [`skills/`](skills/) into any skills directory Claude Code reads:
 
 ```bash
 cp -R skills/* ~/.claude/skills/        # user-level
@@ -154,7 +157,7 @@ curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/m
 
 ## Usage
 
-Most skills trigger automatically from natural language — you generally don't need to name them. The **command-only** skills (`/harden-doc`, `/biz-review`, `/critique-figma-design`, `/verify-design-match`) never auto-trigger; you invoke them explicitly so they don't fire uninvited.
+Most skills trigger automatically from natural language — you generally don't need to name them. The **command-only** skills (`/harden-doc`, `/biz-review`, `/critique-figma-design`, `/verify-design-match`, `/figma-to-dev-docs`) never auto-trigger; you invoke them explicitly so they don't fire uninvited.
 
 **Model-invocable (trigger from a request):**
 
@@ -186,6 +189,9 @@ Most skills trigger automatically from natural language — you generally don't 
 
 - **Check a running page matches its Figma design (any/all states):**
   > `/verify-design-match` *(with the page URL/route and the Figma frame **or section** it should match; it auto-matches the default state and asks you for the route + recipe of any others, then emits a PDF + an AI-agent Markdown report)*
+
+- **Generate AI-developer docs (PRD + spec + tests) from a Figma frame/section:**
+  > `/figma-to-dev-docs` *(with the frame or section linked; it confirms the screen/state mapping, interviews you for the missing behavior/business context, then writes `PRD.md` + `spec.md` + `test-cases.md`)*
 
 - **Stress-test a plan or spec until every branch is resolved:**
   > `/harden-doc docs/specs/pos-spec.md`
@@ -297,16 +303,23 @@ skills/
 │   └── SKILL.md                             # doc command: resolve every decision branch (/harden-doc)
 ├── biz-review/
 │   └── SKILL.md                             # doc command: founder-lens scope review (/biz-review)
-└── spec-to-brief/
-    ├── SKILL.md                             # generative: spec/UCN → stakeholder brief
+├── spec-to-brief/
+│   ├── SKILL.md                             # generative: spec/UCN → stakeholder brief
+│   └── references/
+│       └── product-brief-template.md        # flexible product-brief template (single-owner)
+└── figma-to-dev-docs/
+    ├── SKILL.md                             # read-only Figma → dev docs (/figma-to-dev-docs)
     └── references/
-        └── product-brief-template.md        # flexible product-brief template (single-owner)
+        ├── context-interview.md             # interview topics + completion bar (single-owner)
+        └── doc-templates.md                 # the three output formats + traceability (single-owner)
 
 docs/                                        # ADRs only — gitignored, not shipped to users
 └── adr/
     ├── 0001-page-to-figma-depends-on-official-figma-plugin.md
     ├── 0002-p1-composes-sibling-suite-skills.md
-    └── 0003-verify-design-match-requires-playwright-and-figma-access.md
+    ├── 0003-verify-design-match-requires-playwright-and-figma-access.md
+    ├── 0004-implement-figma-design-emits-no-report.md
+    └── 0005-figma-to-dev-docs-separate-from-spec-to-brief.md
 ```
 
 > **Shared format contract:** the two `references/use-case-narrative-format.md` files are byte-identical on purpose — one skill writes the format, the other reads it. **If you edit one, edit the other to match.**
