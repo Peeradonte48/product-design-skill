@@ -72,6 +72,30 @@ Eleven skills across four groups. Most go **design/flow → code or doc**; `page
 
 ---
 
+## Portability — Claude Code vs. claude.ai chat
+
+This suite is built for **Claude Code**, not the claude.ai chat interface. Most skills read/write a target codebase, drive a running app, or talk to the Figma plugin — none of which the claude.ai cloud sandbox can see. The dividing line is simple: **skills that operate on a doc or idea could port; skills that touch your codebase, your running app, or write to Figma cannot.**
+
+| Skill | claude.ai chat | Blocker |
+|-------|:--------------:|---------|
+| **harden-doc** | ✅ Portable | Pure conversation over a pasted doc |
+| **biz-review** | ✅ Portable | Conversation + web search (works on claude.ai) |
+| **spec-to-brief** | ✅ Portable | Generative writeup from a pasted spec |
+| **figjam-to-use-case-narrative** | 🟡 Degraded | Needs the Figma read connector; read-only so plausible |
+| **figjam-sitemap-to-spec** | 🟡 Degraded | Same — Figma read connector only |
+| **critique-figma-design** | 🟡 Degraded | Figma read works, but screenshot/pixel-sampling steps are unreliable in-sandbox |
+| **implement-figma-design** | ❌ No | Writes code into *your* repo + screenshots *your* running UI |
+| **use-case-narrative-to-prototype** | ❌ No | Builds a runnable prototype in your project |
+| **figma-design-to-working-prototype** | ❌ No | Orchestrates the two above |
+| **page-to-figma** | ❌ No | Needs your running page's live DOM + Figma writes |
+| **verify-design-match** | ❌ No | Hard fail-closed on Playwright **and** Figma access |
+
+**Why the sandbox is the limit:** claude.ai Agent Skills run in an isolated cloud container that can run code and use connected MCP servers, but **cannot see your local repo** (the build skills' whole job), **cannot reach `localhost`** on your machine (your running app is invisible), and **cannot drive a browser** against your dev server (the Playwright steps `verify-design-match` and the prototype/verify skills rely on).
+
+The cleanly portable set is the **three no-Figma doc skills** (`harden-doc`, `biz-review`, `spec-to-brief`). This repo ships **Claude Code skills only** (curl|bash install — no claude.ai package format); the table above is guidance for anyone considering a manual port, not a second supported distribution.
+
+---
+
 ## Install
 
 ### Option A — one-liner (no clone)
