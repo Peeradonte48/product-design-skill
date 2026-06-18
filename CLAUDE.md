@@ -44,7 +44,11 @@ Both `figjam-to-use-case-narrative` and `use-case-narrative-to-prototype` carry 
 
 ## Distribution & versioning
 
-The suite is distributed **curl | bash only** via `install.sh` (npm and the Claude Code plugin marketplace were deliberately declined — don't reintroduce them unasked). The repo-root [`VERSION`](VERSION) file is the suite's single version of record: `install.sh` stamps it into a `~/.claude/skills/.product-design-skill.version` manifest, and `--update` / `--check` read it so already-installed users can update easily. **Bump `VERSION` whenever you change shipped skill content** (anything under `skills/`) — otherwise `--check` will tell users they're current when they aren't. Docs-only changes (README/CLAUDE.md/ADRs) don't need a bump.
+The suite is distributed **curl | bash only** via `install.sh` (npm and the Claude Code plugin marketplace were deliberately declined — don't reintroduce them unasked). The repo-root [`VERSION`](VERSION) file is the suite's single version of record: `install.sh` stamps it into a `~/.claude/skills/.product-design-skill.version` manifest, and `--update` / `--check` read it so already-installed users can update easily. **Bump `VERSION` whenever you change shipped skill content** (anything under `skills/`) — otherwise `--check` will tell users they're current when they aren't. Docs-only changes (README/CLAUDE.md/ADRs) don't need a bump. The `install.sh` **`SKILLS` array must list every shipped skill** — a skill missing there is silently never installed (this is how `figma-to-dev-docs` shipped uninstalled until v1.4.0).
+
+User-facing changes are logged in the repo-root [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog style) — **add an entry on every `VERSION` bump**; the update notice and installer output link to it.
+
+**Update notifications.** As of v1.4.0 the installer writes a Claude Code `SessionStart` hook (into `settings.json`, via `python3` or `jq`) that checks GitHub's raw `VERSION` at most once per 24h and prints a one-line "update available" notice — on by default, `--no-notify` opts out, `--uninstall` removes it, fails silent offline. The notifier script is generated inline by `install.sh` (a `%q`-injected header + a quoted heredoc body), not stored as a separate repo file, so the raw `curl | bash` one-liner stays self-contained. Keep it **fail-closed and non-blocking** — a notifier must never delay or break a session.
 
 ## Conventions when editing these skills
 

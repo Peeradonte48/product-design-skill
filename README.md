@@ -120,7 +120,8 @@ cd product-design-skill
 ./install.sh --update        # update installed skills to the latest (no prompts)
 ./install.sh --check         # report installed vs latest version, then exit
 ./install.sh --force         # overwrite existing copies without prompting
-./install.sh --uninstall     # remove the twelve skills
+./install.sh --no-notify     # install/update without the daily update-check hook
+./install.sh --uninstall     # remove the twelve skills (and the update-check hook)
 ```
 
 ### Option C — copy by hand
@@ -152,6 +153,14 @@ curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/m
 ```
 
 (Cloned the repo instead? `git pull` then `./install.sh --update`.) Each install stamps a small `~/.claude/skills/.product-design-skill.version` manifest so `--check`/`--update` know what you have. Then restart Claude Code (or run `/doctor`).
+
+### Update notifications
+
+So you don't have to remember to run `--check`, the installer adds a Claude Code **`SessionStart` hook** that checks for a newer version and, when one exists, prints a one-line notice (with the update command and a [changelog](CHANGELOG.md) link) at the start of a session.
+
+- **On by default.** Opt out at install time with `--no-notify`; remove it later with `--uninstall` (or re-run `--update --no-notify`).
+- **Quiet and safe.** It checks at most once every 24 hours, makes a single lightweight request to GitHub's raw [`VERSION`](VERSION) file, and **fails silently** when you're offline. It never blocks or delays a session.
+- **Where it lives.** The hook is registered in your `settings.json` (`~/.claude/settings.json` for a user install, `<project>/.claude/settings.json` for `--project`); a small notifier script sits next to the version manifest. Registration uses `python3` or `jq` — if neither is present the installer prints manual steps instead. Custom `--dir` installs write the script but don't auto-register it.
 
 ---
 
