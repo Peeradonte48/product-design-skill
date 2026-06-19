@@ -10,7 +10,7 @@
 #   ./install.sh --dir <path>    # install into a custom skills directory
 #   ./install.sh --force         # overwrite existing skills without prompting
 #   ./install.sh --no-notify     # install/update without the daily update-check hook
-#   ./install.sh --uninstall     # remove the suite skills, commands, and update-check hook
+#   ./install.sh --uninstall     # remove the suite skills, commands, figma-cli, and update-check hook
 #
 # Remote one-liners (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
@@ -306,6 +306,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
       say "skip   ${c} (not installed)"
     fi
   done
+  if [ -d "$CLI_TARGET" ]; then
+    rm -rf "${CLI_TARGET:?}"; say "removed figma-cli"
+  else
+    say "skip   figma-cli (not installed)"
+  fi
   [ -f "$MANIFEST" ] && rm -f "$MANIFEST" && say "removed version manifest"
   deregister_hook "$NOTIFY_SCRIPT" "$SETTINGS"
   [ -f "$NOTIFY_SCRIPT" ] && rm -f "$NOTIFY_SCRIPT" && say "removed update-check script"
@@ -428,6 +433,7 @@ fi
   echo "installed=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
   echo "skills=${SKILLS[*]}"
   echo "commands=${COMMANDS[*]}"
+  echo "figma-cli=$(cli_src_version)"
 } > "$MANIFEST"
 
 # --- update-check hook -----------------------------------------------------
