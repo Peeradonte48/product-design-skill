@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.5.0] — 2026-06-19
+
+### Added
+- `page-to-figma`: **flow mode** — a multi-state run (e.g. a 12-state payment flow) no
+  longer rebuilds and re-verifies every frame independently. States of one screen are
+  near-duplicates, so the skill now extracts **all** states in one Playwright pass up front,
+  builds and fully verifies **one base** to green, then **clones that base in Figma and
+  applies only the per-state delta**, delta-verifying the changed nodes (plus shared
+  invariants) rather than re-reading the whole tree. Flows default to **raw mode** (fewest
+  correction iterations). This collapses a flow from `N × (build + full-verify)` to
+  `1 × (build + full-verify) + (N−1) × (clone + delta-verify)` with the numeric-correctness
+  guarantee unchanged.
+
+### Changed
+- `page-to-figma`: the verify loop now **batches MCP round-trips** — read all of a frame's
+  node properties back in one `use_figma` script, diff in-agent, apply all corrections in
+  one write script, re-read once (~3 round-trips per iteration instead of hundreds). The
+  per-property checklist and tolerances are unchanged; this is pure latency removal.
+
 ## [1.4.1] — 2026-06-19
 
 ### Changed
@@ -68,5 +87,6 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...main
+[1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...main
+[1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.3.1...v1.4.0

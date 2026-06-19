@@ -62,6 +62,41 @@ extraction gap — a dropped clip, a mis-keyed asset — is identical across eve
 catching it once is far cheaper than rebuilding a dozen frames (and re-stashing a shared
 asset dictionary) after the user reviews them.
 
+### Flow mode — reuse the proven base, don't rebuild N frames
+
+A "flow" is a set of **near-duplicate states** of the same screen (a payment flow's 12
+states share one layout; they differ by a small delta — a modal opens, an error banner
+appears, a radio flips selected, a button disables). Rebuilding and re-verifying the whole
+tree per state is the dominant cost of a flow run, and almost all of it is redundant. When
+the run is a flow, switch the pipeline from *N independent builds* to **one proven base +
+per-state deltas**:
+
+1. **Extract every state up front, in one Playwright pass (step 1).** Drive the page through
+   all states and capture each state's section→element tree of real numbers *before any
+   Figma write*. Extraction touches only the page, so doing it all first is cheap and lets
+   you compute the **inter-state delta** (which nodes changed, were added, or removed
+   between states) while no Figma round-trip is in flight.
+2. **Default a flow to raw mode (step 2).** Raw mode bypasses the plugin's inaccuracy at the
+   source, so it needs the fewest correction iterations — and you pay that tax once on the
+   base instead of N times.
+3. **Build and fully verify ONE base state to green** (steps 3–4, full checklist + clipping
+   pass). This is the representative frame from "prove on ONE first" — now it also becomes
+   the thing every sibling reuses.
+4. **For each remaining state, clone the verified base in Figma and apply only the delta.**
+   One `use_figma` clone of the green base costs a single round-trip and inherits every
+   already-correct value; then write *only* the nodes the inter-state delta flagged as
+   changed/added/removed. Do **not** rebuild the shared layout — it is already proven.
+5. **Delta-verify, not full-verify, the clones (step 4).** Run the numeric checklist on the
+   **changed nodes only**, plus a cheap re-assert that the clone's shared invariants still
+   hold (frame size, the clip rects of any scroll container the delta touched). A clone
+   starts green by construction, so a full re-read of every property on every state is wasted
+   work — reserve that for the base.
+
+This collapses a flow from `N × (build + full-verify)` to `1 × (build + full-verify) +
+(N−1) × (clone + delta-verify)`. The numeric-correctness guarantee is unchanged — every
+shipped value still traces to a green checkpoint; deltas just stop re-proving what the base
+already proved.
+
 ### 1. Extract truth from the running page
 
 Open the page with Playwright. Walk the layout into a structured **section → element
@@ -95,6 +130,11 @@ full-viewport `inset: 0` scrim down to its scroll-container ancestor.
 Capture the reference screenshot. This tree of real numbers is the **only** thing you
 trust for the rest of the run.
 
+**For a flow, extract every state in this one pass** (see Flow mode) and record, per state,
+its **delta from the base** — which nodes change value, appear, or disappear. Extraction is
+page-only and cheap, so batching all states here keeps the Figma write phase uninterrupted
+and gives you the delta you need to clone-and-patch instead of rebuild.
+
 ### 2. Detect the design system, then ask bind-vs-raw (per run)
 
 Inspect the destination Figma file (`get_variable_defs`, `search_design_system`,
@@ -106,7 +146,10 @@ Inspect the destination Figma file (`get_variable_defs`, `search_design_system`,
   and drive `figma-use` directly from the DOM tree; this avoids the plugin's inaccuracy at
   the source and is the most trustworthy path.
 
-If no design system exists, default to **raw** and say so.
+If no design system exists, default to **raw** and say so. **For a flow, prefer raw even
+when a design system exists** — it minimizes the per-state correction iterations you'd
+otherwise pay N times (see Flow mode). Choose bind mode for a flow only when the user needs
+design-system binding and accepts that cost.
 
 ### 3. Build — delegate the bulk, own the values
 
@@ -136,6 +179,12 @@ color-range, font-loading, and layout rules that make writes work).
   dictionary the moment extraction culls one asset (e.g. the clip fix drops an off-screen
   icon), invalidating every already-built frame and forcing a full rebuild instead of a
   partial one.
+- **Flow mode — clone the proven base, write only the delta.** For sibling states, duplicate
+  the green base frame via `use_figma` and apply only the nodes the inter-state delta flagged
+  (step 1); do not rebuild the shared layout. The clone inherits the base's correct values,
+  clipping (`clipsContent`), and asset fills — which is exactly why the asset dictionary must
+  be **content-hash keyed** (above): a clone has to resolve the same hashes the base did, and
+  usage-order keys would reindex out from under it.
 - **Auto-width text can drift a few px** when Figma's font metrics differ from the browser's
   (e.g. Noto Looped Thai advances wider than Chrome's). Harmless for left-aligned runs; it can
   nudge a centered label off-center. When exactness matters, set a **fixed width = measured DOM
@@ -173,6 +222,15 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    visually confirm only what numbers can't catch: z-order, a missing/extra element, a
    blank image placeholder. Never treat it as the convergence criterion. Never report
    pixel-perfect without a green property checklist **and** a clean clipping pass.
+
+**Batch the round-trips — the MCP call is the latency unit, not the diff.** Each `use_figma`
+call is a round-trip to the plugin; doing one per node or per property is what makes a flow
+crawl. Read **all** of a frame's node properties back in a *single* `use_figma` script that
+returns one JSON blob, **diff in-agent** against the extracted truth, apply **all** of that
+frame's corrections in a *single* write script, then re-read once. That is ~3 round-trips per
+correction iteration instead of hundreds — identical checklist and tolerances, far less
+wall-clock. On a cloned flow state, the batched read-back covers only the **delta nodes plus
+shared invariants** (see Flow mode), not the whole tree.
 
 ## When to stop and ask
 
