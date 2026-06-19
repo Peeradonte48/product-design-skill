@@ -7,3 +7,6 @@
 Thumbs.db
 
 docs/
+
+# Vendored figma-cli: ship source, install deps at install time
+figma-cli/node_modules/
