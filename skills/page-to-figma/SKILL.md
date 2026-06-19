@@ -55,6 +55,13 @@ do not eyeball — mark the result **unverified** or offer to set up Playwright.
 
 ## Workflow
 
+**When a run spans multiple frames/states, prove the pipeline on ONE first.** Build one
+representative frame, run the *full* verify on it (the numeric checklist **and** the
+clipping / negative-space pass in step 4), and only then batch the rest. A systematic
+extraction gap — a dropped clip, a mis-keyed asset — is identical across every frame;
+catching it once is far cheaper than rebuilding a dozen frames (and re-stashing a shared
+asset dictionary) after the user reviews them.
+
 ### 1. Extract truth from the running page
 
 Open the page with Playwright. Walk the layout into a structured **section → element
@@ -66,6 +73,24 @@ tree**. For each node, record real numbers from `getComputedStyle`:
 - Typography — family, size, weight, line-height, letter-spacing.
 - Box model — flex/grid direction, alignment, sizing (so you can rebuild as auto-layout).
 - Icons / images — the asset and its rendered size/position.
+- **Overflow / clipping** — record `overflow-x/y` for every node; treat `hidden | auto |
+  scroll | clip` as a clip boundary (see the clip paragraph below).
+- **Placeholder text** — capture input `placeholder` attributes. They are not DOM text
+  nodes, so an empty field reads blank in Figma unless you capture the prompt explicitly.
+
+**Record overflow and reproduce clipping — it's what the browser actually paints.**
+`getBoundingClientRect()` returns full geometry regardless of overflow, so off-screen
+content (a 1240px-wide table inside a 1120px scroll card) extracts as if visible and will
+*bleed past* the container's rounded edge in Figma — every node placed and styled correctly,
+the frame still wrong because content the page *hides* is *shown*. Maintain a **clip-rect
+stack** as you walk the DOM: push the intersection of the current clip with an element's box
+whenever its `overflow-x/y` clips, and **cull or clamp every emitted node to the active
+clip** — exactly what the browser paints. **Positioned elements escape the stack:** on
+entering a `position: fixed` element, **reset the clip to the viewport** (it's
+viewport-relative and ignores overflow ancestors) before emitting it and its subtree;
+`position: absolute` escapes clipping from *statically-positioned* ancestors too. Modals,
+drawers, scrims, toasts, and dropdowns all hit this — a naive clip stack wrongly shrinks a
+full-viewport `inset: 0` scrim down to its scroll-container ancestor.
 
 Capture the reference screenshot. This tree of real numbers is the **only** thing you
 trust for the rest of the run.
@@ -101,6 +126,20 @@ color-range, font-loading, and layout rules that make writes work).
 - Build and correct at **auto-layout altitude** — set layout direction, gap, padding, and
   sizing modes to match the DOM box model rather than stamping absolute x/y. Absolute
   coordinates ripple: a fix to one node breaks its siblings.
+- **Carry clipping into the build.** For every source element that clips (step 1), set
+  `clipsContent = true` on the frame you build from it — that reproduces the paint exactly,
+  but only while the build preserves nesting (the auto-layout altitude above does). If a path
+  collapses to a flat list of absolutely-positioned nodes, nesting is lost and `clipsContent`
+  has nothing to attach to — fall back to the step-1 clip-stack cull/clamp instead.
+- **Key any deduped assets by content hash, not usage order.** If you dedup icons/images into
+  a shared dictionary, hash the content for the key. Usage-order keys reindex the *whole*
+  dictionary the moment extraction culls one asset (e.g. the clip fix drops an off-screen
+  icon), invalidating every already-built frame and forcing a full rebuild instead of a
+  partial one.
+- **Auto-width text can drift a few px** when Figma's font metrics differ from the browser's
+  (e.g. Noto Looped Thai advances wider than Chrome's). Harmless for left-aligned runs; it can
+  nudge a centered label off-center. When exactness matters, set a **fixed width = measured DOM
+  width** instead of auto-resize.
 
 ### 4. Verify by numeric read-back — and correct until green (the heart of this skill)
 
@@ -122,10 +161,18 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
 4. **Re-read the whole checklist** after each batch of corrections (not just the nodes you
    touched) to catch ripple. **Loop until the checklist is all-green.** That green state is
    the termination condition — stop there; do not keep visually polishing.
-5. **Screenshot diff is a coarse backstop only.** Once green, `get_screenshot` the node and
+5. **Clipping / negative-space pass — verify what the page *hides*, not just what it shows.**
+   The per-property checklist only inspects nodes that *exist*, so it stays green while
+   *extra* content that should have been clipped away bleeds into view. For each scroll/clip
+   container, assert no emitted node extends beyond its clip rect (or is clamped to it). Then
+   add a **container-edge visual backstop**: `get_screenshot` the right/bottom edges of cards
+   and scroll regions *specifically* — a bleed is invisible at full-frame thumbnail zoom but
+   obvious at the card's corner. A green property checklist is necessary but **not
+   sufficient**; also verify the hide.
+6. **Screenshot diff is a coarse backstop only.** Once green, `get_screenshot` the node and
    visually confirm only what numbers can't catch: z-order, a missing/extra element, a
    blank image placeholder. Never treat it as the convergence criterion. Never report
-   pixel-perfect without a green property checklist.
+   pixel-perfect without a green property checklist **and** a clean clipping pass.
 
 ## When to stop and ask
 
