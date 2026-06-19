@@ -10,7 +10,7 @@
 #   ./install.sh --dir <path>    # install into a custom skills directory
 #   ./install.sh --force         # overwrite existing skills without prompting
 #   ./install.sh --no-notify     # install/update without the daily update-check hook
-#   ./install.sh --uninstall     # remove the twelve skills (and the update-check hook)
+#   ./install.sh --uninstall     # remove the suite skills, commands, and update-check hook
 #
 # Remote one-liners (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
@@ -46,6 +46,12 @@ SKILLS=(
   "biz-review"
   "spec-to-brief"
 )
+# Single-file slash commands shipped alongside the skills (installed into the
+# sibling commands/ dir, e.g. ~/.claude/commands). Add the filename here for
+# every command shipped under the repo-root commands/ dir.
+COMMANDS=(
+  "update-design-skills.md"
+)
 
 # --- arg parsing -----------------------------------------------------------
 TARGET=""
@@ -72,6 +78,7 @@ done
 MANIFEST="${TARGET}/${MANIFEST_NAME}"
 NOTIFY_SCRIPT="${TARGET}/${NOTIFY_SCRIPT_NAME}"
 SETTINGS="$(dirname "$TARGET")/settings.json"   # ~/.claude/settings.json or <proj>/.claude/settings.json
+CMD_TARGET="$(dirname "$TARGET")/commands"      # ~/.claude/commands or <proj>/.claude/commands
 
 say() { printf '  %s\n' "$1"; }
 contains() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
@@ -254,6 +261,10 @@ fi
 LATEST="$(cat "$(dirname "$SRC")/VERSION" 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
 [ -n "$LATEST" ] || LATEST="unknown"
 
+# Slash commands live next to skills/ in the repo (commands/), and install into
+# the sibling commands/ dir of the skills target.
+CMD_SRC="$(dirname "$SRC")/commands"
+
 # --- check (read-only; report and exit) ------------------------------------
 if [ "$CHECK" -eq 1 ]; then
   inst="$(installed_version)"
@@ -282,6 +293,13 @@ if [ "$UNINSTALL" -eq 1 ]; then
       rm -rf "${TARGET:?}/${s}"; say "removed ${s}"
     else
       say "skip   ${s} (not installed)"
+    fi
+  done
+  for c in "${COMMANDS[@]}"; do
+    if [ -f "${CMD_TARGET}/${c}" ]; then
+      rm -f "${CMD_TARGET}/${c}"; say "removed ${c}"
+    else
+      say "skip   ${c} (not installed)"
     fi
   done
   [ -f "$MANIFEST" ] && rm -f "$MANIFEST" && say "removed version manifest"
@@ -327,12 +345,43 @@ for s in "${SKILLS[@]}"; do
   fi
 done
 
+# --- slash commands (single files → sibling commands/ dir) -----------------
+if [ -d "$CMD_SRC" ]; then
+  mkdir -p "${CMD_TARGET}"
+  for c in "${COMMANDS[@]}"; do
+    src="${CMD_SRC}/${c}"; dest="${CMD_TARGET}/${c}"
+    if [ ! -f "$src" ]; then
+      say "skip   ${c} (missing in source)"; continue
+    fi
+    if [ -f "$dest" ]; then
+      if [ "$UPDATE" -eq 1 ]; then
+        if diff -q "$src" "$dest" >/dev/null 2>&1; then
+          say "unchanged ${c}"; unchanged=$((unchanged+1)); continue
+        fi
+      elif [ "$FORCE" -ne 1 ]; then
+        printf '  command %s already exists. Overwrite? [y/N] ' "$c"
+        read -r ans </dev/tty || ans="n"
+        case "$ans" in [yY]*) ;; *) say "skip   ${c}"; continue ;; esac
+      fi
+      cp "$src" "$dest"; say "updated ${c}"; updated=$((updated+1))
+    else
+      cp "$src" "$dest"; say "installed ${c}"; added=$((added+1))
+    fi
+  done
+fi
+
 # --- prune skills removed upstream (update only, only ones we installed) ----
 if [ "$UPDATE" -eq 1 ] && [ -f "$MANIFEST" ]; then
   old_skills="$(grep '^skills=' "$MANIFEST" 2>/dev/null | head -1 | cut -d= -f2- || true)"
   for os in $old_skills; do
     if ! contains "$os" "${SKILLS[@]}" && [ -d "${TARGET}/${os}" ]; then
       rm -rf "${TARGET:?}/${os}"; say "removed ${os} (no longer in suite)"; removed=$((removed+1))
+    fi
+  done
+  old_cmds="$(grep '^commands=' "$MANIFEST" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  for oc in $old_cmds; do
+    if ! contains "$oc" "${COMMANDS[@]}" && [ -f "${CMD_TARGET}/${oc}" ]; then
+      rm -f "${CMD_TARGET}/${oc}"; say "removed ${oc} (no longer in suite)"; removed=$((removed+1))
     fi
   done
 fi
@@ -342,6 +391,7 @@ fi
   echo "version=${LATEST}"
   echo "installed=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
   echo "skills=${SKILLS[*]}"
+  echo "commands=${COMMANDS[*]}"
 } > "$MANIFEST"
 
 # --- update-check hook -----------------------------------------------------
@@ -376,4 +426,5 @@ if [ "$UPDATE" -ne 1 ]; then
   echo "  implement-figma-design  •  figjam-to-use-case-narrative  •  use-case-narrative-to-prototype"
   echo "  figma-design-to-working-prototype  •  figjam-sitemap-to-spec  •  page-to-figma  •  spec-to-brief"
   echo "Run the command-only skills:  /critique-figma-design  •  /verify-design-match  •  /figma-to-dev-docs  •  /harden-doc <doc>  •  /biz-review <doc>"
+  echo "Update from inside Claude Code anytime:  /update-design-skills"
 fi

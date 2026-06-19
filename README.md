@@ -154,6 +154,14 @@ curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/m
 
 (Cloned the repo instead? `git pull` then `./install.sh --update`.) Each install stamps a small `~/.claude/skills/.product-design-skill.version` manifest so `--check`/`--update` know what you have. Then restart Claude Code (or run `/doctor`).
 
+**From inside Claude Code**, the suite also ships a slash command so you don't have to drop to a terminal:
+
+```
+/update-design-skills
+```
+
+It runs the same `--update` for you in-session, then reports the summary. (Installed into `~/.claude/commands/` alongside the skills; a restart or `/doctor` still loads the freshly-updated files.)
+
 ### Update notifications
 
 So you don't have to remember to run `--check`, the installer adds a Claude Code **`SessionStart` hook** that checks for a newer version and, when one exists, prints a one-line notice (with the update command and a [changelog](CHANGELOG.md) link) at the start of a session.
