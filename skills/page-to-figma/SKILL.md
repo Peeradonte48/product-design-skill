@@ -195,7 +195,7 @@ design-system binding and accepts that cost.
 
 **Bind-vs-raw is orthogonal to structure.** It decides only whether values resolve to
 Figma variables/components or to literals — **both modes build the same nested auto-layout
-tree** (the build contract in step 3). Raw is *not* a license to flatten: driving `figma-use`
+tree** (the build contract in step 3). Raw is *not* a license to flatten: driving `render` / `render-batch`
 straight from the DOM tree means transpiling that tree's nesting, not stamping its nodes as
 absolute siblings.
 
