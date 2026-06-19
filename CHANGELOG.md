@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.6.0] — 2026-06-19
+
+### Added
+- **Shipped slash command `/update-design-skills`** — update the suite from inside
+  Claude Code instead of pasting the `curl | bash -s -- --update` one-liner. The
+  installer now ships single-file slash commands from a repo-root `commands/` dir
+  into the sibling `commands/` dir of the skills target (e.g. `~/.claude/commands`),
+  with the same selective-update, prune-on-removal, and `--uninstall` handling the
+  skills get. The version manifest records an additional `commands=` line so
+  `--update` can prune a command dropped from the suite. After updating, restart
+  Claude Code (or run `/doctor`) so the new command file is discovered.
+
 ## [1.5.0] — 2026-06-19
 
 ### Added
@@ -87,6 +99,7 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...main
+[1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...main
+[1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.3.1...v1.4.0
