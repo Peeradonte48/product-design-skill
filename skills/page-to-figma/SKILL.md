@@ -18,6 +18,16 @@ the **running rendered page** — fills, sizes, spacing, radii, typography, icon
 imagery. "Close enough" is a failure. You prove the match with a **numeric property
 read-back against the page's real computed styles**, never by eyeballing two screenshots.
 
+**Pixel-perfect is half the job — the frame must also be a *usable design artifact*, not a
+vector tracing.** The output is a **nested tree of auto-layout frames that mirrors the page's
+box model** (containers with direction / gap / padding / sizing, leaf text and icons inside
+them), with every layer named from its DOM source. A flat pile of absolutely-positioned
+siblings that *looks* identical is still a **failure**: nothing reflows, nothing is nameable,
+rows aren't duplicable, and the whole reason to put a page in Figma — to *work* with it —
+is gone. Pixel-perfect **and** structured are both required; a frame that is one but not the
+other does not pass. The two only genuinely conflict at font metrics — named and handled
+below, not dodged by going flat.
+
 This skill exists because the official Figma plugin's code→Figma transfer is **not
 accurate enough**, and the usual fix (build, then visually compare and tweak) **does not
 converge** — it oscillates or plays whack-a-mole and still ships slop. This skill is an
@@ -56,11 +66,12 @@ do not eyeball — mark the result **unverified** or offer to set up Playwright.
 ## Workflow
 
 **When a run spans multiple frames/states, prove the pipeline on ONE first.** Build one
-representative frame, run the *full* verify on it (the numeric checklist **and** the
-clipping / negative-space pass in step 4), and only then batch the rest. A systematic
-extraction gap — a dropped clip, a mis-keyed asset — is identical across every frame;
-catching it once is far cheaper than rebuilding a dozen frames (and re-stashing a shared
-asset dictionary) after the user reviews them.
+representative frame, run the *full* verify on it (the numeric checklist, the **structure
+gate**, and the clipping / negative-space pass in step 4), and only then batch the rest. A
+systematic extraction gap — a dropped clip, a mis-keyed asset, a subtree that flattened
+instead of nesting — is identical across every frame; catching it once is far cheaper than
+rebuilding a dozen frames (and re-stashing a shared asset dictionary) after the user reviews
+them.
 
 ### Flow mode — reuse the proven base, don't rebuild N frames
 
@@ -79,17 +90,21 @@ per-state deltas**:
 2. **Default a flow to raw mode (step 2).** Raw mode bypasses the plugin's inaccuracy at the
    source, so it needs the fewest correction iterations — and you pay that tax once on the
    base instead of N times.
-3. **Build and fully verify ONE base state to green** (steps 3–4, full checklist + clipping
-   pass). This is the representative frame from "prove on ONE first" — now it also becomes
-   the thing every sibling reuses.
+3. **Build and fully verify ONE base state to green** (steps 3–4, full checklist + structure
+   gate + clipping pass). This is the representative frame from "prove on ONE first" — and
+   because every sibling clones it, its **structure** is what they all inherit, so a flat base
+   would make every state flat. Get the base nested and green once.
 4. **For each remaining state, clone the verified base in Figma and apply only the delta.**
    One `use_figma` clone of the green base costs a single round-trip and inherits every
-   already-correct value; then write *only* the nodes the inter-state delta flagged as
-   changed/added/removed. Do **not** rebuild the shared layout — it is already proven.
+   already-correct value **and the base's nesting**; then write *only* the nodes the
+   inter-state delta flagged as changed/added/removed, **patching against the tree** (replace
+   a container's children; never re-stamp the subtree as flat siblings). Do **not** rebuild
+   the shared layout — it is already proven.
 5. **Delta-verify, not full-verify, the clones (step 4).** Run the numeric checklist on the
    **changed nodes only**, plus a cheap re-assert that the clone's shared invariants still
-   hold (frame size, the clip rects of any scroll container the delta touched). A clone
-   starts green by construction, so a full re-read of every property on every state is wasted
+   hold (frame size, the clip rects of any scroll container the delta touched, and that the
+   patched subtree is still nested — not flattened by the patch). A clone starts green and
+   structured by construction, so a full re-read of every property on every state is wasted
    work — reserve that for the base.
 
 This collapses a flow from `N × (build + full-verify)` to `1 × (build + full-verify) +
@@ -106,7 +121,10 @@ tree**. For each node, record real numbers from `getComputedStyle`:
 - Box metrics — width, height, padding, margins, gaps.
 - `border-radius`, borders, shadows.
 - Typography — family, size, weight, line-height, letter-spacing.
-- Box model — flex/grid direction, alignment, sizing (so you can rebuild as auto-layout).
+- Box model — flex/grid direction, alignment, sizing **per container node** (this is what
+  you rebuild each node as auto-layout — keep it, don't collapse the tree to a paint list).
+- A **layer name** per node, derived from its class/role/tag (`.snav-item` → "NavItem",
+  `.tbl tbody tr` → "Row") — captured here so the build can name layers for free.
 - Icons / images — the asset and its rendered size/position.
 - **Overflow / clipping** — record `overflow-x/y` for every node; treat `hidden | auto |
   scroll | clip` as a clip boundary (see the clip paragraph below).
@@ -151,6 +169,12 @@ when a design system exists** — it minimizes the per-state correction iteratio
 otherwise pay N times (see Flow mode). Choose bind mode for a flow only when the user needs
 design-system binding and accepts that cost.
 
+**Bind-vs-raw is orthogonal to structure.** It decides only whether values resolve to
+Figma variables/components or to literals — **both modes build the same nested auto-layout
+tree** (the build contract in step 3). Raw is *not* a license to flatten: driving `figma-use`
+straight from the DOM tree means transpiling that tree's nesting, not stamping its nodes as
+absolute siblings.
+
 ### 3. Build — delegate the bulk, own the values
 
 **Load `figma-use` first** (mandatory before any `use_figma` call — it carries the
@@ -166,14 +190,31 @@ color-range, font-loading, and layout rules that make writes work).
   `generate_figma_design` capture** of the running page to source `imageHash` values, then
   apply those hashes to your image fills. (The same capture doubles as a pixel-perfect
   visual reference.)
-- Build and correct at **auto-layout altitude** — set layout direction, gap, padding, and
-  sizing modes to match the DOM box model rather than stamping absolute x/y. Absolute
-  coordinates ripple: a fix to one node breaks its siblings.
+- **Build the DOM tree, not a paint list — this is the build contract.** Transpile the
+  extracted tree (step 1) node-for-node into nested auto-layout: each block/flex/grid
+  **container** → an auto-layout frame carrying its captured direction / gap / padding /
+  sizing modes; each **leaf with bg/border** → a frame with those fills/strokes; each **text
+  run** → a text leaf (fixed-width per the font-metric note below); each **icon/svg** → a
+  vector. Set direction, gap, padding, and sizing to match the box model rather than stamping
+  absolute x/y. Absolute coordinates ripple — a fix to one node breaks its siblings — *and*
+  produce exactly the flat tracing this skill exists to avoid. The data to do this is already
+  in the extracted tree; only the build target is in question, so the auto-layout tree is the
+  default and only ship target.
+- **Name every layer from its DOM source** — use the name captured in step 1 (`.snav-item` →
+  "NavItem", `.tbl tbody tr` → "Row", `.pm-method-name` → "MethodName"). A navigable layer
+  panel is free and high-value; a pile of `Frame 217`s is not a deliverable.
+- **Flat absolute is a per-subtree last resort, and it must be `log()`ged.** Drop to absolute
+  placement *only* for a subtree you genuinely cannot express as auto-layout (e.g.
+  `display:grid` with `subgrid`, or arbitrary overlap with no box-model parent). When you do,
+  `log()` **which** subtree and **why** (e.g. "PaymentGrid: subgrid — flattened") so the lost
+  structure is visible up front, not discovered as a 200-sibling pile at the end. Never
+  flatten a whole frame because flat is easier to build or verify — that is the failure mode
+  this skill guards against, not a sanctioned shortcut.
 - **Carry clipping into the build.** For every source element that clips (step 1), set
-  `clipsContent = true` on the frame you build from it — that reproduces the paint exactly,
-  but only while the build preserves nesting (the auto-layout altitude above does). If a path
-  collapses to a flat list of absolutely-positioned nodes, nesting is lost and `clipsContent`
-  has nothing to attach to — fall back to the step-1 clip-stack cull/clamp instead.
+  `clipsContent = true` on the frame you build from it — which the nested build makes trivial:
+  the clip attaches to that container frame and reproduces the paint exactly. Only inside a
+  `log()`ged flat-fallback subtree, where there is no container to attach to, fall back to the
+  step-1 clip-stack cull/clamp instead.
 - **Key any deduped assets by content hash, not usage order.** If you dedup icons/images into
   a shared dictionary, hash the content for the key. Usage-order keys reindex the *whole*
   dictionary the moment extraction culls one asset (e.g. the clip fix drops an off-screen
@@ -182,13 +223,24 @@ color-range, font-loading, and layout rules that make writes work).
 - **Flow mode — clone the proven base, write only the delta.** For sibling states, duplicate
   the green base frame via `use_figma` and apply only the nodes the inter-state delta flagged
   (step 1); do not rebuild the shared layout. The clone inherits the base's correct values,
-  clipping (`clipsContent`), and asset fills — which is exactly why the asset dictionary must
-  be **content-hash keyed** (above): a clone has to resolve the same hashes the base did, and
-  usage-order keys would reindex out from under it.
-- **Auto-width text can drift a few px** when Figma's font metrics differ from the browser's
-  (e.g. Noto Looped Thai advances wider than Chrome's). Harmless for left-aligned runs; it can
-  nudge a centered label off-center. When exactness matters, set a **fixed width = measured DOM
-  width** instead of auto-resize.
+  **nesting**, clipping (`clipsContent`), and asset fills. **Patch the delta against the tree,
+  not a flat index** — replace the children of the one container the state changed (e.g. swap
+  the `Table` frame's `Row` children; leave the `Sidebar` and `Topbar` frames untouched),
+  addressing nodes by their place in the structure. A structured base makes a state a
+  localized subtree replacement; a flat base would force per-state re-stamping. This is also
+  why the asset dictionary must be **content-hash keyed** (above): a clone has to resolve the
+  same hashes the base did, and usage-order keys would reindex out from under it.
+- **Font metrics are the one real conflict between structure and pixels — pin text width to
+  resolve it.** Figma's text advance for many fonts is a few px wider than Chrome's (e.g. Geist,
+  Geist Mono, Noto Looped Thai). In a flat build that's harmless (a left-anchored run just
+  renders slightly wider in place) — which is the actual reason flat feels "safer." But in a
+  nested build a **hug-content** text box that's a few px wide **pushes its siblings**, and the
+  deviation **compounds down a row**. Do not retreat to flat over this. Default text leaves to a
+  **FIXED width = the measured DOM rect width** (you already measured it in step 1), with the
+  parent giving the leaf `FILL`/fixed rather than `HUG`. That keeps reflow at the container
+  level while pinning the pixels — most of the editing benefit, none of the metric drift. Where
+  a gap must be exact, prefer **fixed item-spacing** (and a fixed-size spacer frame if needed)
+  over trusting `space-between` to resolve identically.
 
 ### 4. Verify by numeric read-back — and correct until green (the heart of this skill)
 
@@ -208,9 +260,24 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
 3. **Correct every failure** with a targeted `use_figma` write using the **exact extracted
    value** — stamp the truth on top of the plugin's output.
 4. **Re-read the whole checklist** after each batch of corrections (not just the nodes you
-   touched) to catch ripple. **Loop until the checklist is all-green.** That green state is
-   the termination condition — stop there; do not keep visually polishing.
-5. **Clipping / negative-space pass — verify what the page *hides*, not just what it shows.**
+   touched) to catch ripple. **Loop until the checklist is all-green.** Green pixels are
+   necessary but **not** the whole termination condition — the structure gate (next) must
+   also pass before the frame is done. Don't keep visually polishing past green.
+5. **Structure gate — assert the frame is a tree, not a pile.** The per-property checklist
+   has *no notion of structure*: a flat frame of absolutely-positioned siblings passes every
+   color/geometry/font assertion above while being structurally useless, so the numeric
+   checklist exerts **zero** pressure toward nesting. Without this gate the build optimizes
+   hard for the thing it measures (pixels) and not at all for the thing it doesn't (layers).
+   Add — and require — a cheap structural read-back alongside the numeric one:
+   - **Direct-child sanity:** each built frame's direct-child count tracks its DOM container's
+     child count (a handful), not the whole node total. A frame with dozens-to-hundreds of
+     direct children is flat by definition — **fail**.
+   - **Ancestry:** every text/icon leaf has a non-frame-root auto-layout ancestor — it lives
+     inside a real container, not pinned to the page root.
+   - **Fallback accounting:** the only flat regions are subtrees you `log()`ged as deliberate
+     fallbacks (step 3). An *unlogged* flat region is a regression — rebuild it nested, don't
+     sign it off. What isn't measured won't get built; this gate is that measurement.
+6. **Clipping / negative-space pass — verify what the page *hides*, not just what it shows.**
    The per-property checklist only inspects nodes that *exist*, so it stays green while
    *extra* content that should have been clipped away bleeds into view. For each scroll/clip
    container, assert no emitted node extends beyond its clip rect (or is clamped to it). Then
@@ -218,10 +285,11 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    and scroll regions *specifically* — a bleed is invisible at full-frame thumbnail zoom but
    obvious at the card's corner. A green property checklist is necessary but **not
    sufficient**; also verify the hide.
-6. **Screenshot diff is a coarse backstop only.** Once green, `get_screenshot` the node and
+7. **Screenshot diff is a coarse backstop only.** Once green, `get_screenshot` the node and
    visually confirm only what numbers can't catch: z-order, a missing/extra element, a
    blank image placeholder. Never treat it as the convergence criterion. Never report
-   pixel-perfect without a green property checklist **and** a clean clipping pass.
+   pixel-perfect without a green property checklist, a **passing structure gate**, and a
+   clean clipping pass.
 
 **Batch the round-trips — the MCP call is the latency unit, not the diff.** Each `use_figma`
 call is a round-trip to the plugin; doing one per node or per property is what makes a flow
@@ -229,7 +297,9 @@ crawl. Read **all** of a frame's node properties back in a *single* `use_figma` 
 returns one JSON blob, **diff in-agent** against the extracted truth, apply **all** of that
 frame's corrections in a *single* write script, then re-read once. That is ~3 round-trips per
 correction iteration instead of hundreds — identical checklist and tolerances, far less
-wall-clock. On a cloned flow state, the batched read-back covers only the **delta nodes plus
+wall-clock. Have that same read-back also return each node's **parent id and direct-child
+count** so the structure gate (step 5) runs in-agent off the one blob — it costs no extra
+round-trip. On a cloned flow state, the batched read-back covers only the **delta nodes plus
 shared invariants** (see Flow mode), not the whole tree.
 
 ## When to stop and ask

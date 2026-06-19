@@ -5,6 +5,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.7.0] — 2026-06-20
+
+### Changed
+- `page-to-figma`: **auto-layout structure is now the build contract, not just an
+  aspiration.** A real run (FIP Payment Method Configuration) was pixel-perfect but emitted
+  a *flat list of absolutely-positioned siblings* — 216 direct children of one frame, nothing
+  grouped, named, or reflowable — because flat was the path of least resistance and the
+  verifier only rewarded pixels. The skill now:
+  - States a **positive build contract**: transpile the extracted DOM tree node-for-node into
+    nested auto-layout (container → auto-layout frame with captured direction/gap/padding/
+    sizing; bg/border leaf → frame; text → fixed-width text leaf; icon → vector), with every
+    layer **named from its DOM source** (`.snav-item` → "NavItem").
+  - Demotes **flat absolute to a per-subtree last resort that must be `log()`ged** (which
+    subtree, and why — e.g. "subgrid — flattened"), so lost structure is visible up front, not
+    discovered as a sibling pile at the end. Never flatten a whole frame because it's easier to
+    verify.
+  - Names the **one real structure↔pixel conflict (font metrics)** and prescribes the fix —
+    fixed-width text leaves (width = measured DOM rect) so a hug-content box can't push siblings
+    and compound down a row — instead of dodging it by going flat.
+  - Clarifies **bind-vs-raw is orthogonal to structure**: both modes build the nested tree; raw
+    is not a license to flatten.
+
+### Added
+- `page-to-figma`: a **structure gate** in the verify loop, a peer of the numeric checklist.
+  Pixel-green is necessary but not sufficient — the gate asserts direct-child sanity (no
+  dozens-to-hundreds of direct children), leaf ancestry (every text/icon lives in a real
+  auto-layout container), and fallback accounting (the only flat regions are logged ones). It
+  folds into the existing batched read-back (parent id + child count in the same blob), so it
+  costs no extra round-trip. **Flow mode** clones inherit the base's nesting and patch the
+  delta **against the tree** (replace a container's children), never re-stamping a flat list.
+
 ## [1.6.0] — 2026-06-19
 
 ### Added
@@ -99,7 +130,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...main
+[1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...main
+[1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.3.1...v1.4.0
