@@ -6,7 +6,8 @@ description: >-
   running app and wants it recreated/mirrored in Figma exactly. Triggers: "put our
   settings page into Figma", "recreate this screen in Figma exactly", "mirror our live
   pricing page in Figma", "build our running app's page in Figma to match." This is the
-  accuracy orchestrator: it supervises the official Figma plugin rather than trusting it.
+  accuracy orchestrator: it drives the vendored figma-cli (local, no rate limit)
+  to build and verify, falling back to the official Figma plugin only when the CLI is unavailable.
   Do NOT use it to push a finished Figma design INTO code (that's implement-figma-design),
   or to design something brand-new in Figma with no source page.
 ---
@@ -36,15 +37,39 @@ holds that truth as a checklist and corrects the plugin's output until every pro
 matches. It is the **running-page → Figma** path; its mirror is `implement-figma-design`
 (Figma → code).
 
-## Hard dependency — stop if it's missing
+## Engines — figma-cli primary, Figma MCP fallback
 
-This skill **supervises** the official Figma plugin; it does not reimplement its write
-mechanics. It requires the official Figma plugin skills `figma-use` and
-`figma-generate-design`, plus the Figma MCP tools (including `generate_figma_design`).
-This is a deliberate hard dependency (see the repo's
-`docs/adr/0001-page-to-figma-depends-on-official-figma-plugin.md`). **If the official
-Figma plugin is not installed, stop and tell the user to install it** — do not silently
-degrade or hand-roll a partial build.
+This skill drives Figma through the **vendored figma-cli** (it talks to Figma Desktop
+locally over CDP — no API token, no rate limit, far cheaper in tokens), and supervises its
+output for accuracy. Invoke it by absolute path; define this once at the start of a run:
+
+    FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"     # project install, if present
+    # else: FIGMA_CLI="node ${HOME}/.claude/figma-cli/src/index.js"   # user install
+
+Prefer the project copy (`./.claude/figma-cli/src/index.js`) when it exists, else the user
+copy (`~/.claude/figma-cli/src/index.js`).
+
+### Connection & consent — never patch Figma silently
+
+1. Check `$FIGMA_CLI daemon status`. If connected, proceed.
+2. If it is **down**, STOP and ask the user to connect — explain the two modes in plain
+   terms: **Yolo** (`$FIGMA_CLI connect`) applies a small reversible patch to Figma Desktop
+   for a hands-off connection; **Safe** (`$FIGMA_CLI connect --safe`) uses a plugin bridge
+   and patches nothing. **Never auto-run `connect`** — patching the user's Figma is their
+   decision, not a silent side-effect of this skill.
+3. Confirm the **target file** before the first write: run `$FIGMA_CLI files` / `$FIGMA_CLI
+   canvas info`. The CLI builds into whatever Figma Desktop file is focused (it has no
+   per-node URL targeting). If more than one file is open or the active page is ambiguous,
+   state the detected target and ask before building. With one unambiguous file, name it in
+   your narration and proceed.
+
+### When the CLI is unavailable — announce, then fall back
+
+If the user cannot or will not connect the CLI (no Figma Desktop, restricted machine, no
+Node), do **not** silently degrade. **Announce** that you are switching to the
+**rate-limited Figma MCP path** (the verify loop may throttle) and how to enable the fast
+path, then follow `references/mcp-fallback.md`. Stop entirely only when **neither** engine
+is available — then tell the user what to install.
 
 ## Before you proceed — ask until clear
 
@@ -95,7 +120,7 @@ per-state deltas**:
    because every sibling clones it, its **structure** is what they all inherit, so a flat base
    would make every state flat. Get the base nested and green once.
 4. **For each remaining state, clone the verified base in Figma and apply only the delta.**
-   One `use_figma` clone of the green base costs a single round-trip and inherits every
+   One `$FIGMA_CLI duplicate` of the green base costs a single round-trip and inherits every
    already-correct value **and the base's nesting**; then write *only* the nodes the
    inter-state delta flagged as changed/added/removed, **patching against the tree** (replace
    a container's children; never re-stamp the subtree as flat siblings). Do **not** rebuild
@@ -155,13 +180,12 @@ and gives you the delta you need to clone-and-patch instead of rebuild.
 
 ### 2. Detect the design system, then ask bind-vs-raw (per run)
 
-Inspect the destination Figma file (`get_variable_defs`, `search_design_system`,
-`get_libraries`). Then **ask the user**:
+Inspect the destination Figma file with the CLI: `$FIGMA_CLI variables list` (alias
+`var list`), `$FIGMA_CLI collections list` (alias `col list`), and `$FIGMA_CLI spec
+"<Component>"` to see a reusable component's authoritative spec + reuse handle. Then **ask the user**:
 
-- **Bind mode** — bind product values to matching Figma variables/components. Needs
-  `figma-generate-design` for component/variable discovery and reuse.
-- **Raw mode** — emit exact values, no binding. You may **bypass `figma-generate-design`**
-  and drive `figma-use` directly from the DOM tree; this avoids the plugin's inaccuracy at
+- **Bind mode** — bind product values to matching Figma variables/components. Bind product values to Figma variables via `render`'s `var:name` syntax (pin a named collection with `--collection`); drop existing components as real instances with `$FIGMA_CLI instantiate "<Component>"` instead of rebuilding them.
+- **Raw mode** — emit exact values, no binding. Emit exact values via `render` / `render-batch` directly from the DOM tree; this avoids the plugin's inaccuracy at
   the source and is the most trustworthy path.
 
 If no design system exists, default to **raw** and say so. **For a flow, prefer raw even
@@ -177,19 +201,19 @@ absolute siblings.
 
 ### 3. Build — delegate the bulk, own the values
 
-**Load `figma-use` first** (mandatory before any `use_figma` call — it carries the
-color-range, font-loading, and layout rules that make writes work).
+**Build with `render` / `render-batch` — its JSX *is* nested auto-layout, so it matches the
+build contract natively.** Never use `eval` to create nodes (the CLI's own hard rule) — `eval`
+is read/mutate only.
 
-- **Bind mode:** hand assembly to `figma-generate-design` and follow its workflow. **Do
-  not re-describe or paraphrase its assembly steps here** — that duplication silently
-  drifts out of sync. Just delegate.
-- **Raw mode:** build auto-layout frames directly via `figma-use`, using the extracted
-  numbers.
-- **Images:** the `use_figma` Plugin API **cannot** fetch external image URLs. When the
-  page has any image, run `figma-generate-design`'s **mandatory parallel
-  `generate_figma_design` capture** of the running page to source `imageHash` values, then
-  apply those hashes to your image fills. (The same capture doubles as a pixel-perfect
-  visual reference.)
+- **Bind mode:** build with `$FIGMA_CLI render` / `render-batch` using `var:name` bindings
+  (`--collection <name>` to pin the system); use `$FIGMA_CLI instantiate "<Component>"` to
+  reuse an existing component rather than cloning it.
+- **Raw mode:** build auto-layout frames directly with `$FIGMA_CLI render` / `render-batch`
+  using the extracted numbers, no binding.
+- **Images:** the CLI fetches external image URLs directly — use `$FIGMA_CLI create image
+  "<url>"` or a `<Image>` node in JSX. (This removes the MCP path's `imageHash` workaround.)
+  If a fetch fails for an auth'd/CORS'd asset, fall back to the MCP `generate_figma_design`
+  capture for that one asset (see `references/mcp-fallback.md`).
 - **Build the DOM tree, not a paint list — this is the build contract.** Transpile the
   extracted tree (step 1) node-for-node into nested auto-layout: each block/flex/grid
   **container** → an auto-layout frame carrying its captured direction / gap / padding /
@@ -221,7 +245,7 @@ color-range, font-loading, and layout rules that make writes work).
   icon), invalidating every already-built frame and forcing a full rebuild instead of a
   partial one.
 - **Flow mode — clone the proven base, write only the delta.** For sibling states, duplicate
-  the green base frame via `use_figma` and apply only the nodes the inter-state delta flagged
+  the green base frame via `$FIGMA_CLI duplicate` and apply only the nodes the inter-state delta flagged
   (step 1); do not rebuild the shared layout. The clone inherits the base's correct values,
   **nesting**, clipping (`clipsContent`), and asset fills. **Patch the delta against the tree,
   not a flat index** — replace the children of the one container the state changed (e.g. swap
@@ -248,17 +272,14 @@ Do **not** gate on a screenshot diff. Browser and Figma rasterize differently
 (anti-aliasing, font hinting, subpixel rounding), so a picture diff is never zero even when
 the design is semantically perfect — a vision gate can't terminate. Instead:
 
-1. **Read actual Figma values back** off the built nodes via `use_figma` — `fills`,
-   `width`, `height`, padding, `itemSpacing`, `cornerRadius`, strokes, effects, and font
-   properties.
+1. **Read actual Figma values back** with **one** `$FIGMA_CLI eval` script returning a single JSON blob (fills, width, height, padding, itemSpacing, cornerRadius, strokes, effects, font properties, **plus each node's parent id and direct-child count**). `$FIGMA_CLI verify "<id>" --measure` is a fast sizing cross-check; `$FIGMA_CLI spec "<Comp>" --check "<id>"` enforces component fidelity (exit-nonzero on mismatch).
 2. **Assert numerically** against the DOM-extracted values on a **finite per-property
    checklist**, with explicit tolerances:
    - Colors: **exact hex**.
    - Geometry (w/h/padding/gap/radius): **±0.5px**.
    - Font family/weight: **exact**. Font size/line-height: **±0.5px**.
    Each property is a definite pass/fail — no subjective "close enough."
-3. **Correct every failure** with a targeted `use_figma` write using the **exact extracted
-   value** — stamp the truth on top of the plugin's output.
+3. **Correct every failure** with a targeted write inside **one batched `$FIGMA_CLI eval` script** that mutates the wrong nodes (mutate-existing only — not node creation, and not one `set` per fix, which would be a round-trip per correction) using the **exact extracted value** — stamp the truth on top of the plugin's output.
 4. **Re-read the whole checklist** after each batch of corrections (not just the nodes you
    touched) to catch ripple. **Loop until the checklist is all-green.** Green pixels are
    necessary but **not** the whole termination condition — the structure gate (next) must
@@ -281,26 +302,22 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    The per-property checklist only inspects nodes that *exist*, so it stays green while
    *extra* content that should have been clipped away bleeds into view. For each scroll/clip
    container, assert no emitted node extends beyond its clip rect (or is clamped to it). Then
-   add a **container-edge visual backstop**: `get_screenshot` the right/bottom edges of cards
+   add a **container-edge visual backstop**: `$FIGMA_CLI verify "<id>" --save <png>` (then Read the PNG to inspect the card/scroll edges) the right/bottom edges of cards
    and scroll regions *specifically* — a bleed is invisible at full-frame thumbnail zoom but
    obvious at the card's corner. A green property checklist is necessary but **not
    sufficient**; also verify the hide.
-7. **Screenshot diff is a coarse backstop only.** Once green, `get_screenshot` the node and
-   visually confirm only what numbers can't catch: z-order, a missing/extra element, a
+7. **Screenshot diff is a coarse backstop only.** Once green, `$FIGMA_CLI verify "<id>" --save <png>` (then Read it) and visually confirm only what numbers can't catch: z-order, a missing/extra element, a
    blank image placeholder. Never treat it as the convergence criterion. Never report
    pixel-perfect without a green property checklist, a **passing structure gate**, and a
    clean clipping pass.
 
-**Batch the round-trips — the MCP call is the latency unit, not the diff.** Each `use_figma`
-call is a round-trip to the plugin; doing one per node or per property is what makes a flow
-crawl. Read **all** of a frame's node properties back in a *single* `use_figma` script that
-returns one JSON blob, **diff in-agent** against the extracted truth, apply **all** of that
-frame's corrections in a *single* write script, then re-read once. That is ~3 round-trips per
-correction iteration instead of hundreds — identical checklist and tolerances, far less
-wall-clock. Have that same read-back also return each node's **parent id and direct-child
-count** so the structure gate (step 5) runs in-agent off the one blob — it costs no extra
-round-trip. On a cloned flow state, the batched read-back covers only the **delta nodes plus
-shared invariants** (see Flow mode), not the whole tree.
+**Batch the round-trips — each CLI call is the latency unit.** Read **all** of a frame's
+node properties back in a *single* `$FIGMA_CLI eval` script that returns one JSON blob,
+**diff in-agent** against the extracted truth, apply **all** of that frame's corrections in a
+*single* `$FIGMA_CLI eval` write script (mutate-existing), then re-read once — ~3 calls per
+iteration, not hundreds. Have the read-back also return each node's parent id and
+direct-child count so the structure gate (step 5) runs in-agent off the one blob. On a cloned
+flow state, the read-back covers only the delta nodes plus shared invariants.
 
 ## When to stop and ask
 
@@ -311,12 +328,13 @@ improvise.
 
 ## Helpful resources
 
-- **Official Figma plugin skills (hard dependency):** `figma-use` (mandatory before any
-  `use_figma` write) and `figma-generate-design` (bulk assembly + design-system discovery).
-- **Figma MCP tools** (only the ones this skill actually uses — it reads the *page* from
-  the DOM, not the design from Figma): `get_variable_defs`, `search_design_system`,
-  `get_libraries` (design-system detection, step 2); `get_screenshot` (the coarse backstop,
-  step 4); `use_figma` and `generate_figma_design` (build). If a call returns "tool not
-  found," the connected Figma MCP is outdated — tell the user to update Figma.
+- **Vendored figma-cli (primary engine):** `node ~/.claude/figma-cli/src/index.js` (or the
+  project copy under `./.claude/figma-cli/`). Key verbs: `daemon status`, `connect` /
+  `connect --safe` (user-run only), `files`, `canvas info`, `variables list`,
+  `collections list`, `spec`, `instantiate`, `render` / `render-batch`, `create image`,
+  `duplicate`, `eval` (bulk read / mutate-existing — never to create), `verify --measure` /
+  `verify --save`. Full reference: the vendored `REFERENCE.md` is not shipped; rely on these.
+- **MCP fallback:** `references/mcp-fallback.md` — used only when the CLI is unavailable
+  and the user has been told (announce the rate-limited path).
 - **Browser tooling:** Playwright (or the project's equivalent) for DOM extraction and the
-  backstop screenshot.
+  backstop screenshot — unchanged; the page is always read from the live DOM, never Figma.
