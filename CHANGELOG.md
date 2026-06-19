@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.4.1] — 2026-06-19
+
+### Changed
+- `page-to-figma`: now treats **CSS overflow clipping as a first-class extraction
+  concern**, fixing the "element-accurate but wrong-looking" failure mode (off-screen
+  content bleeding past a clipping container in Figma). Step 1 records `overflow-x/y` and
+  reproduces clipping via a clip-rect stack, with a `position: fixed`/`absolute` escape
+  rule so overlays aren't over-clipped; Step 3 carries the clip into the build
+  (`clipsContent = true`, with a flat-model fallback); Step 4 adds a **clipping /
+  negative-space verification pass** that checks what the page *hides*, not just the
+  per-property values of nodes that exist. Also: prove the pipeline on one frame before
+  fanning out, key deduped assets by content hash (not usage order), capture input
+  `placeholder` text, and a fixed-width caveat for auto-width text whose font metrics drift
+  (e.g. Thai). From real-run feedback on the FIP Payment & Tax transcription.
+
 ## [1.4.0] — 2026-06-19
 
 ### Added
@@ -53,4 +68,5 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.4.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.3.1...main
+[1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...main
+[1.4.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.3.1...v1.4.0
