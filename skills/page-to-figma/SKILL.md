@@ -17,7 +17,10 @@ description: >-
 The goal is a **1:1, 100% pixel-perfect match** between the Figma frame you produce and
 the **running rendered page** — fills, sizes, spacing, radii, typography, icons, and
 imagery. "Close enough" is a failure. You prove the match with a **numeric property
-read-back against the page's real computed styles**, never by eyeballing two screenshots.
+read-back against the page's real computed styles**, never by eyeballing two screenshots —
+and that read-back is **position-first**: a node's absolute x/y is the assertion that most
+encodes "matches the page." Matching sizes, padding, color, and type is necessary but **not
+sufficient** — a perfectly-sized node in the wrong spot is still wrong.
 
 **Pixel-perfect is half the job — the frame must also be a *usable design artifact*, not a
 vector tracing.** The output is a **nested tree of auto-layout frames that mirrors the page's
@@ -153,8 +156,15 @@ tree**. For each node, record real numbers from `getComputedStyle`:
 - Icons / images — the asset and its rendered size/position.
 - **Overflow / clipping** — record `overflow-x/y` for every node; treat `hidden | auto |
   scroll | clip` as a clip boundary (see the clip paragraph below).
-- **Placeholder text** — capture input `placeholder` attributes. They are not DOM text
-  nodes, so an empty field reads blank in Figma unless you capture the prompt explicitly.
+- **Placeholder text** — capture input `placeholder` attributes (and any `value`). They are
+  not DOM text nodes, so an empty field reads blank in Figma unless you capture the prompt
+  explicitly — and the build must then *render* it (step 3), not just hold it.
+- **Positioning** — record each node's `position`. Treat `absolute | fixed` as **out of
+  flow**: capture its offset within the nearest positioned ancestor (for `fixed`, the
+  viewport), and **exclude it from any geometry-based direction inference** for its parent.
+  An out-of-flow child's x/y must never vote row-vs-column — an absolutely-positioned overlay
+  icon whose `y` differs from a sibling input will wrongly flip the parent to a column and
+  stack the icon *above* the field instead of *over* it.
 
 **Record overflow and reproduce clipping — it's what the browser actually paints.**
 `getBoundingClientRect()` returns full geometry regardless of overflow, so off-screen
@@ -219,11 +229,24 @@ is read/mutate only.
   **container** → an auto-layout frame carrying its captured direction / gap / padding /
   sizing modes; each **leaf with bg/border** → a frame with those fills/strokes; each **text
   run** → a text leaf (fixed-width per the font-metric note below); each **icon/svg** → a
-  vector. Set direction, gap, padding, and sizing to match the box model rather than stamping
+  vector; each **`<input>`** → a text leaf rendering its captured `placeholder`/`value`
+  (step 1) in the input's computed placeholder color/font (an input has no DOM text child, so
+  without this the field ships blank — a captured-but-unrendered placeholder is a dropped
+  value, not a handled one); each **out-of-flow node** (`position:absolute|fixed`) → a child
+  with `layoutPositioning='ABSOLUTE'` at its captured offset within the nearest positioned
+  ancestor, **never** a flow sibling (which mis-infers the parent's direction). Set direction,
+  gap, padding, and sizing to match the box model rather than stamping
   absolute x/y. Absolute coordinates ripple — a fix to one node breaks its siblings — *and*
   produce exactly the flat tracing this skill exists to avoid. The data to do this is already
   in the extracted tree; only the build target is in question, so the auto-layout tree is the
   default and only ship target.
+- **Translate alignment faithfully — it's where the container lands its content.** Map
+  `justify-content` → `primaryAxisAlignItems` and `align-items` → `counterAxisAlignItems`;
+  translate a `table-cell` `vertical-align:middle` → `counterAxisAlignItems='CENTER'`. **Don't
+  silently drop alignment** when CSS resolves to `normal`/`stretch` — emit the explicit Figma
+  equivalent. Lost cross-axis alignment is invisible to a sizes-only checklist (content sticks
+  to the top/left of an over-tall/wide box, off by several px) until the position assertion
+  (step 4) catches it — so build it right *and* verify it.
 - **Name every layer from its DOM source** — use the name captured in step 1 (`.snav-item` →
   "NavItem", `.tbl tbody tr` → "Row", `.pm-method-name` → "MethodName"). A navigable layer
   panel is free and high-value; a pile of `Frame 217`s is not a deliverable.
@@ -272,14 +295,25 @@ Do **not** gate on a screenshot diff. Browser and Figma rasterize differently
 (anti-aliasing, font hinting, subpixel rounding), so a picture diff is never zero even when
 the design is semantically perfect — a vision gate can't terminate. Instead:
 
-1. **Read actual Figma values back** with **one** `$FIGMA_CLI eval` script returning a single JSON blob (fills, width, height, padding, itemSpacing, cornerRadius, strokes, effects, font properties, **plus each node's parent id and direct-child count**). `$FIGMA_CLI verify "<id>" --measure` is a fast sizing cross-check; `$FIGMA_CLI spec "<Comp>" --check "<id>"` enforces component fidelity (exit-nonzero on mismatch).
+1. **Read actual Figma values back** with **one** `$FIGMA_CLI eval` script returning a single JSON blob (fills, width, height, padding, itemSpacing, cornerRadius, strokes, effects, font properties, **`absoluteBoundingBox`**, **`layoutMode` / `primaryAxisAlignItems` / `counterAxisAlignItems` / `layoutPositioning`**, **plus each node's parent id and direct-child count**). `$FIGMA_CLI verify "<id>" --measure` is a fast sizing cross-check; `$FIGMA_CLI spec "<Comp>" --check "<id>"` enforces component fidelity (exit-nonzero on mismatch).
 2. **Assert numerically** against the DOM-extracted values on a **finite per-property
    checklist**, with explicit tolerances:
+   - **Absolute position — x/y relative to the frame root, ±1px. This is the PRIMARY
+     assertion.** The DOM rect (viewport-absolute, frame pinned at 0,0) maps directly to
+     frame-relative position — a free, exact ground truth; read it as `node.absoluteBoundingBox`
+     minus the root's. Auto-layout can place a perfectly-sized node in the wrong spot when an
+     ancestor's offset wasn't reproduced (a row whose every cell width is exact but that starts
+     29px too far left because the scroll column collapsed its children to its edge). Matching
+     sizes/padding/gap is necessary but **not** sufficient — position is what "matches the page"
+     means. **The frame is not green until every node's x/y matches.**
+   - **Alignment — exact:** `layoutMode`, `primaryAxisAlignItems`, `counterAxisAlignItems`,
+     `layoutPositioning`, against the CSS the node was built from — so a dropped vertical-center
+     or a flow node that should be `ABSOLUTE` can't pass unnoticed.
    - Colors: **exact hex**.
    - Geometry (w/h/padding/gap/radius): **±0.5px**.
    - Font family/weight: **exact**. Font size/line-height: **±0.5px**.
    Each property is a definite pass/fail — no subjective "close enough."
-3. **Correct every failure** with a targeted write inside **one batched `$FIGMA_CLI eval` script** that mutates the wrong nodes (mutate-existing only — not node creation, and not one `set` per fix, which would be a round-trip per correction) using the **exact extracted value** — stamp the truth on top of the plugin's output.
+3. **Correct every failure** with a targeted write inside **one batched `$FIGMA_CLI eval` script** that mutates the wrong nodes (mutate-existing only — not node creation, and not one `set` per fix, which would be a round-trip per correction) using the **exact extracted value** — stamp the truth on top of the plugin's output. **A position failure is fixed at the cause, not the symptom:** don't nudge the drifting node — correct the responsible ancestor (its padding / alignment / gap, or a per-child margin or centering it dropped), or for a genuinely out-of-flow node pin it with `layoutPositioning='ABSOLUTE'` at the DOM coordinate. Absolute drift almost always traces to one container collapsing its children to its edge, so fixing that ancestor re-seats the whole subtree in a single write.
 4. **Re-read the whole checklist** after each batch of corrections (not just the nodes you
    touched) to catch ripple. **Loop until the checklist is all-green.** Green pixels are
    necessary but **not** the whole termination condition — the structure gate (next) must
@@ -307,16 +341,22 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    obvious at the card's corner. A green property checklist is necessary but **not
    sufficient**; also verify the hide.
 7. **Screenshot diff is a coarse backstop only.** Once green, `$FIGMA_CLI verify "<id>" --save <png>` (then Read it) and visually confirm only what numbers can't catch: z-order, a missing/extra element, a
-   blank image placeholder. Never treat it as the convergence criterion. Never report
-   pixel-perfect without a green property checklist, a **passing structure gate**, and a
-   clean clipping pass.
+   blank image placeholder. A full-frame thumbnail at ~0.5 scale is **far too coarse to show a
+   small layout shift or a blank field** — a 29px row shift and an empty search box both vanish
+   at that zoom. That is exactly why position/alignment must be caught numerically (steps
+   4.2–4.3), not here. As a cheap **secondary** aid you may save **per-region edge shots** (a
+   column's left edge, a row's baseline) the same way the clipping pass does — but the numeric
+   position assertion is the real guard. Never treat the screenshot as the convergence
+   criterion. Never report pixel-perfect without a green property checklist (**position and
+   alignment included**), a **passing structure gate**, and a clean clipping pass.
 
 **Batch the round-trips — each CLI call is the latency unit.** Read **all** of a frame's
 node properties back in a *single* `$FIGMA_CLI eval` script that returns one JSON blob,
 **diff in-agent** against the extracted truth, apply **all** of that frame's corrections in a
 *single* `$FIGMA_CLI eval` write script (mutate-existing), then re-read once — ~3 calls per
-iteration, not hundreds. Have the read-back also return each node's parent id and
-direct-child count so the structure gate (step 5) runs in-agent off the one blob. On a cloned
+iteration, not hundreds. Have the read-back also return each node's `absoluteBoundingBox`,
+alignment props, parent id, and direct-child count so the position/alignment assertions
+(step 4.2) and the structure gate (step 5) both run in-agent off the one blob. On a cloned
 flow state, the read-back covers only the delta nodes plus shared invariants.
 
 ## When to stop and ask

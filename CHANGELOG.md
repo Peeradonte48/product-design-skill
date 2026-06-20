@@ -5,6 +5,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.9.0] - 2026-06-21
+
+### Fixed
+- `page-to-figma` verify had a **position/layout blind spot**: the numeric checklist asserted
+  intrinsic properties (size, padding, gap, radius, fill, type, child-count) but never where a
+  node actually lands, so an auto-layout frame whose every size was exact could ship with rows
+  shifted, badges misplaced, and a malformed search box and still declare "0 failures →
+  pixel-perfect." A reported run passed 2662 property-checks while 565 node positions were off
+  by >1.5px. Verify is now **position-first**.
+
+### Added
+- **Absolute-position assertion (PRIMARY, ±1px)** in the verify checklist — every node's x/y
+  relative to the frame root (read as `absoluteBoundingBox` minus the root's) vs the DOM rect,
+  plus an **alignment assertion** (`layoutMode` / `primaryAxisAlignItems` /
+  `counterAxisAlignItems` / `layoutPositioning`). Both ride in the existing single read-back
+  blob. The correction loop fixes position drift **at the responsible ancestor**, not by
+  nudging the symptom node.
+- Extraction now records each node's `position` and, for `absolute`/`fixed`, its offset within
+  the nearest positioned ancestor — and **excludes out-of-flow children from direction
+  inference** (the bug that stacked an overlay magnifier above the search field instead of over
+  it).
+- Build contract now **renders captured `<input>` `placeholder`/`value` as a real text leaf**
+  (previously captured but dropped, shipping a blank field), builds out-of-flow nodes with
+  `layoutPositioning='ABSOLUTE'`, and **translates cross-axis alignment faithfully** (incl.
+  `table-cell` `vertical-align:middle` → `counterAxisAlignItems='CENTER'`; no silent drop of
+  `normal`/`stretch`).
+
+### Changed
+- The coarse screenshot backstop is documented as unable to show small layout shifts or a blank
+  field by design — reinforcing that position/alignment must be caught numerically; per-region
+  edge shots are offered as an optional secondary aid.
+
 ## [1.8.0] - 2026-06-20
 
 ### Added
@@ -144,7 +176,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...main
+[1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...main
+[1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...v1.5.0
