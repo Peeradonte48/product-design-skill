@@ -95,7 +95,8 @@ do not eyeball — mark the result **unverified** or offer to set up Playwright.
 
 **When a run spans multiple frames/states, prove the pipeline on ONE first.** Build one
 representative frame, run the *full* verify on it (the numeric checklist, the **structure
-gate**, and the clipping / negative-space pass in step 4), and only then batch the rest. A
+gate**, the **extraction-completeness gate**, and the clipping / negative-space pass in step
+4), and only then batch the rest. A
 systematic extraction gap — a dropped clip, a mis-keyed asset, a subtree that flattened
 instead of nesting — is identical across every frame; catching it once is far cheaper than
 rebuilding a dozen frames (and re-stashing a shared asset dictionary) after the user reviews
@@ -119,7 +120,7 @@ per-state deltas**:
    source, so it needs the fewest correction iterations — and you pay that tax once on the
    base instead of N times.
 3. **Build and fully verify ONE base state to green** (steps 3–4, full checklist + structure
-   gate + clipping pass). This is the representative frame from "prove on ONE first" — and
+   gate + extraction-completeness gate + clipping pass). This is the representative frame from "prove on ONE first" — and
    because every sibling clones it, its **structure** is what they all inherit, so a flat base
    would make every state flat. Get the base nested and green once.
 4. **For each remaining state, clone the verified base in Figma and apply only the delta.**
@@ -165,6 +166,29 @@ tree**. For each node, record real numbers from `getComputedStyle`:
   An out-of-flow child's x/y must never vote row-vs-column — an absolutely-positioned overlay
   icon whose `y` differs from a sibling input will wrongly flip the parent to a column and
   stack the icon *above* the field instead of *over* it.
+
+**Walk the whole page — pierce shadow roots, read pseudo-elements, flag the unwalkable.** A
+naive `querySelectorAll` walk silently drops painted content, and because the node never
+exists there is nothing for any later gate to fail — the frame ships green with a hole (the
+same failure shape as the position blind spot: unmeasured ⇒ unbuilt). Three kinds of content
+escape a plain walk:
+
+- **Shadow DOM** — custom elements (many design systems) hide their subtree in a `shadowRoot`,
+  which `querySelectorAll` will not enter. **Recurse into every element's `shadowRoot`** as you
+  walk, reading computed styles on the shadow nodes exactly as you would light-DOM nodes.
+- **Pseudo-elements** — `::before` / `::after` are not DOM nodes but they *paint* (icon-font
+  glyphs, badges, custom checkbox ticks, gradient overlays, dividers). For every element read
+  `getComputedStyle(el, '::before')` and `'::after'`; when `content` is not `none` or the
+  pseudo carries a background/border, **emit it as a real leaf** — a text leaf for a `content`
+  glyph, a frame for decorative bg/border — at the pseudo-element's box.
+- **Unwalkable / opaque nodes** — `<canvas>`, WebGL, `<video>`, and **cross-origin `<iframe>`**
+  have no readable inner structure (the iframe by security policy, the canvas because its
+  content is a bitmap). Do **not** emit an empty frame. **Flag each for rasterization** (step 3)
+  and record its rect.
+
+Carry a **list of flagged unwalkable nodes** to step 3 and the completeness gate (step 4): a
+thing you couldn't walk must end up a thing you *handled* (a captured image), never a thing
+you silently *dropped*.
 
 **Record overflow and reproduce clipping — it's what the browser actually paints.**
 `getBoundingClientRect()` returns full geometry regardless of overflow, so off-screen
@@ -224,6 +248,14 @@ is read/mutate only.
   "<url>"` or a `<Image>` node in JSX. (This removes the MCP path's `imageHash` workaround.)
   If a fetch fails for an auth'd/CORS'd asset, fall back to the MCP `generate_figma_design`
   capture for that one asset (see `references/mcp-fallback.md`).
+- **Rasterize the unwalkable as an image fill — never an empty frame.** For each node flagged
+  in step 1 (`<canvas>`, WebGL, `<video>`, cross-origin `<iframe>`), take an **element
+  screenshot of that node's rect from the live page** (Playwright) and place it as an image
+  fill in a frame of the same box, `log()`ing it ("ChartCanvas: rasterized — opaque content").
+  This is pixel-faithful exactly where the structure is genuinely unreachable, and the `log()`
+  makes the trade visible — the same contract as the flat-fallback rule. **Shadow-DOM subtrees
+  and pseudo-elements are *walkable*** (step 1), so build them as normal nested nodes — rasterize
+  only the genuinely opaque.
 - **Build the DOM tree, not a paint list — this is the build contract.** Transpile the
   extracted tree (step 1) node-for-node into nested auto-layout: each block/flex/grid
   **container** → an auto-layout frame carrying its captured direction / gap / padding /
@@ -332,7 +364,23 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    - **Fallback accounting:** the only flat regions are subtrees you `log()`ged as deliberate
      fallbacks (step 3). An *unlogged* flat region is a regression — rebuild it nested, don't
      sign it off. What isn't measured won't get built; this gate is that measurement.
-6. **Clipping / negative-space pass — verify what the page *hides*, not just what it shows.**
+6. **Extraction-completeness gate — assert the page was *seen*, not just that the seen nodes
+   are right.** Every gate above (numeric, structure, clipping) inspects only nodes that
+   *exist* — so a subtree the walk never produced (a `shadowRoot` it didn't enter, a `::before`
+   glyph it skipped, a `<canvas>` it emitted as an empty frame) leaves **no node to fail**, and
+   the frame ships green with a hole. This is the position blind spot generalized: unmeasured ⇒
+   unbuilt. Close it by measuring what the build can silently skip:
+   - **Painted-area coverage:** in one extra page pass, find every element with non-transparent
+     paint (background, border, text, or replaced content) whose box is **not** covered by an
+     emitted Figma node (diff DOM rects against the read-back's `absoluteBoundingBox` set). An
+     uncovered painted region is a dropped subtree — **fail** and go extract it.
+   - **Flagged-node accounting:** every unwalkable node flagged in step 1 (`<canvas>`, WebGL,
+     `<video>`, cross-origin `<iframe>`) resolved to a **`log()`ged rasterized image**, and
+     every `shadowRoot` / pseudo-element became real nodes. A flagged node with no emitted image
+     is a silent drop, not a handled one — **fail**.
+   This is the gate that catches a blank chart canvas or a vanished web-component subtree before
+   it ships green — cheap, because it runs off the same read-back plus one page-coverage pass.
+7. **Clipping / negative-space pass — verify what the page *hides*, not just what it shows.**
    The per-property checklist only inspects nodes that *exist*, so it stays green while
    *extra* content that should have been clipped away bleeds into view. For each scroll/clip
    container, assert no emitted node extends beyond its clip rect (or is clamped to it). Then
@@ -340,7 +388,7 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    and scroll regions *specifically* — a bleed is invisible at full-frame thumbnail zoom but
    obvious at the card's corner. A green property checklist is necessary but **not
    sufficient**; also verify the hide.
-7. **Screenshot diff is a coarse backstop only.** Once green, `$FIGMA_CLI verify "<id>" --save <png>` (then Read it) and visually confirm only what numbers can't catch: z-order, a missing/extra element, a
+8. **Screenshot diff is a coarse backstop only.** Once green, `$FIGMA_CLI verify "<id>" --save <png>` (then Read it) and visually confirm only what numbers can't catch: z-order, a missing/extra element, a
    blank image placeholder. A full-frame thumbnail at ~0.5 scale is **far too coarse to show a
    small layout shift or a blank field** — a 29px row shift and an empty search box both vanish
    at that zoom. That is exactly why position/alignment must be caught numerically (steps
@@ -348,7 +396,8 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    column's left edge, a row's baseline) the same way the clipping pass does — but the numeric
    position assertion is the real guard. Never treat the screenshot as the convergence
    criterion. Never report pixel-perfect without a green property checklist (**position and
-   alignment included**), a **passing structure gate**, and a clean clipping pass.
+   alignment included**), a **passing structure gate**, a **passing extraction-completeness
+   gate**, and a clean clipping pass.
 
 **Batch the round-trips — each CLI call is the latency unit.** Read **all** of a frame's
 node properties back in a *single* `$FIGMA_CLI eval` script that returns one JSON blob,

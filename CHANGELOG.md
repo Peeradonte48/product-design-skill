@@ -5,6 +5,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.10.0] - 2026-06-21
+
+### Added
+- `page-to-figma` now **walks the whole page**, closing the "silent-green-but-incomplete"
+  class where the build was blind to content the DOM walk never produced:
+  - **Shadow DOM piercing** — the walk recurses into every element's `shadowRoot` (web-component
+    / design-system subtrees no longer vanish).
+  - **Pseudo-element capture** — `::before` / `::after` are read via
+    `getComputedStyle(el, '::before')` and emitted as real leaves (icon-font glyphs, badges,
+    custom checkbox ticks, gradient overlays, dividers).
+  - **Rasterize-the-unwalkable** — `<canvas>`, WebGL, `<video>`, and cross-origin `<iframe>`
+    are flagged at extraction and built as a **`log()`ged image fill** (element screenshot of
+    the node's rect), never an empty frame.
+- **Extraction-completeness gate** — a new verify gate (step 4, peer of the structure and
+  clipping gates): a **painted-area coverage** check (every non-transparent DOM region must be
+  covered by an emitted Figma node, diffed against the read-back's `absoluteBoundingBox` set)
+  plus **flagged-node accounting** (every unwalkable node resolved to a logged raster; every
+  shadow root / pseudo-element became real nodes). This is the position blind spot generalized
+  — *unmeasured ⇒ unbuilt* — and it fails closed on a blank chart canvas or a dropped subtree
+  before the frame can ship green.
+
 ## [1.9.0] - 2026-06-21
 
 ### Fixed
@@ -176,7 +197,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...main
+[1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...main
+[1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...v1.6.0
