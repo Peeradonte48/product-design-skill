@@ -42,8 +42,24 @@ limit, works offline, terse output, and it fetches external image URLs directly 
 ## Alternatives considered
 
 - *Keep MCP primary, CLI opt-in* — leaves the rate-limit pain in place; rejected.
-- *External dependency (user installs the CLI themselves)* — fewer guarantees it's present;
-  the suite is curl|bash, so we ship it instead.
+- *Install from npm (`npm install figma-ds-cli`)* — **dead, not merely inferior.** The npm
+  package `figma-ds-cli` has only **`1.0.0`** published; the audited version (and the one the
+  skill's verb/flag contract is written against) is the GitHub tag **`2.1.0`**, which the
+  maintainer never pushed to npm. `npm install` would silently ship a two-major-behind CLI whose
+  command surface may not match the skill. Worse, the bare name `figma-cli` on npm is an
+  **unrelated, squatted package** (`unic/figma-cli`, "export/scaffold from Figma into style
+  guides") — a name-collision trap. Committing the exact tag is the only way to guarantee the
+  shipped CLI is the one we verified.
+- *External dependency (user installs the CLI themselves)* — same blocker as npm (2.1.0 isn't on
+  npm, so the user would have to git-clone a tag by hand), and it breaks the self-contained
+  curl|bash one-liner; rejected.
+- *Fetch-at-install from GitHub (clone tag `v2.1.0` at install time, nothing committed)* —
+  tempting because it returns the repo to skill-only with **zero committed JS**. Rejected for
+  this suite's portability ethos: it loses offline reproducibility, makes install fail if upstream
+  moves/deletes the tag, and the shipped tree is no longer byte-for-byte auditable from our git.
+  The committed copy is self-contained, offline-safe, and pinned to commit `e69cba0`. The cost —
+  ~22.8k LOC of third-party JS in a formerly skill-only repo — is accepted and fenced (its own
+  `figma-cli/` dir + `VENDORED.md`, never hand-edited).
 - *Git submodule / subtree* — impossible with tarball installs (above).
 - *CLI-only, no fallback* — hard-fails on any box without Figma Desktop/Node; rejected for
   portability.
