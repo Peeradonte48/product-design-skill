@@ -10,7 +10,7 @@
 #   ./install.sh --dir <path>    # install into a custom skills directory
 #   ./install.sh --force         # overwrite existing skills without prompting
 #   ./install.sh --no-notify     # install/update without the daily update-check hook
-#   ./install.sh --uninstall     # remove the suite skills, commands, and update-check hook
+#   ./install.sh --uninstall     # remove the suite skills, commands, figma-cli, and update-check hook
 #
 # Remote one-liners (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/Peeradonte48/product-design-skill/main/install.sh | bash
@@ -79,6 +79,7 @@ MANIFEST="${TARGET}/${MANIFEST_NAME}"
 NOTIFY_SCRIPT="${TARGET}/${NOTIFY_SCRIPT_NAME}"
 SETTINGS="$(dirname "$TARGET")/settings.json"   # ~/.claude/settings.json or <proj>/.claude/settings.json
 CMD_TARGET="$(dirname "$TARGET")/commands"      # ~/.claude/commands or <proj>/.claude/commands
+CLI_TARGET="$(dirname "$TARGET")/figma-cli"     # ~/.claude/figma-cli or <proj>/.claude/figma-cli
 
 say() { printf '  %s\n' "$1"; }
 contains() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
@@ -264,6 +265,9 @@ LATEST="$(cat "$(dirname "$SRC")/VERSION" 2>/dev/null | head -1 | tr -d '[:space
 # Slash commands live next to skills/ in the repo (commands/), and install into
 # the sibling commands/ dir of the skills target.
 CMD_SRC="$(dirname "$SRC")/commands"
+CLI_SRC="$(dirname "$SRC")/figma-cli"
+# Read the vendored CLI version from its package.json (grep — Node may be absent at install time)
+cli_src_version() { sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "${CLI_SRC}/package.json" 2>/dev/null | head -1; }
 
 # --- check (read-only; report and exit) ------------------------------------
 if [ "$CHECK" -eq 1 ]; then
@@ -302,6 +306,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
       say "skip   ${c} (not installed)"
     fi
   done
+  if [ -d "$CLI_TARGET" ]; then
+    rm -rf "${CLI_TARGET:?}"; say "removed figma-cli"
+  else
+    say "skip   figma-cli (not installed)"
+  fi
   [ -f "$MANIFEST" ] && rm -f "$MANIFEST" && say "removed version manifest"
   deregister_hook "$NOTIFY_SCRIPT" "$SETTINGS"
   [ -f "$NOTIFY_SCRIPT" ] && rm -f "$NOTIFY_SCRIPT" && say "removed update-check script"
@@ -370,6 +379,38 @@ if [ -d "$CMD_SRC" ]; then
   done
 fi
 
+# --- vendored figma-cli (Node CLI → sibling figma-cli/ dir) -----------------
+# Shipped as committed source; deps installed here. Best-effort and non-fatal:
+# a box without Node still gets the skills, and page-to-figma uses the MCP fallback.
+if [ -d "$CLI_SRC" ]; then
+  cli_changed=0
+  if [ -d "$CLI_TARGET" ]; then
+    if [ "$UPDATE" -eq 1 ] && diff -rq -x '.DS_Store' -x 'node_modules' "$CLI_SRC" "$CLI_TARGET" >/dev/null 2>&1; then
+      say "unchanged figma-cli"
+    else
+      rm -rf "${CLI_TARGET:?}/src" "${CLI_TARGET:?}/plugin"
+      cp -R "${CLI_SRC}/." "$CLI_TARGET/"
+      find "$CLI_TARGET" -name '.DS_Store' -type f -delete 2>/dev/null || true
+      cli_changed=1; say "updated figma-cli"
+    fi
+  else
+    mkdir -p "$CLI_TARGET"; cp -R "${CLI_SRC}/." "$CLI_TARGET/"
+    find "$CLI_TARGET" -name '.DS_Store' -type f -delete 2>/dev/null || true
+    cli_changed=1; say "installed figma-cli"
+  fi
+  if [ "$cli_changed" -eq 1 ]; then
+    if command -v npm >/dev/null 2>&1; then
+      if ( cd "$CLI_TARGET" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1 ); then
+        say "figma-cli: dependencies installed"
+      else
+        say "figma-cli: npm install failed — page-to-figma will use the Figma MCP fallback"
+      fi
+    else
+      say "figma-cli: Node/npm not found — skipped deps; page-to-figma will use the Figma MCP fallback"
+    fi
+  fi
+fi
+
 # --- prune skills removed upstream (update only, only ones we installed) ----
 if [ "$UPDATE" -eq 1 ] && [ -f "$MANIFEST" ]; then
   old_skills="$(grep '^skills=' "$MANIFEST" 2>/dev/null | head -1 | cut -d= -f2- || true)"
@@ -392,6 +433,7 @@ fi
   echo "installed=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)"
   echo "skills=${SKILLS[*]}"
   echo "commands=${COMMANDS[*]}"
+  echo "figma-cli=$(cli_src_version)"
 } > "$MANIFEST"
 
 # --- update-check hook -----------------------------------------------------

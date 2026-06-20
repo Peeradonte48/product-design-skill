@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.8.0] - 2026-06-20
+
+### Added
+- Vendored `silships/figma-cli` (MIT, pinned to v2.1.0) under `figma-cli/`, installed alongside
+  the skills (`npm install` best-effort; non-fatal without Node).
+- `page-to-figma` now drives figma-cli as its **primary** engine — local CDP, no Figma API
+  rate limit, fetches image URLs directly — with the official Figma plugin MCP retained as an
+  **announced** fallback (`skills/page-to-figma/references/mcp-fallback.md`).
+- ADR 0006 recording the decision; ADR 0001 marked superseded-in-part.
+
+### Changed
+- The skill never auto-connects (never patches Figma Desktop): it stops and asks the user to
+  connect. It confirms the target Figma file before the first write.
+
 ## [1.7.0] — 2026-06-20
 
 ### Changed
@@ -130,7 +144,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...main
+[1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...main
+[1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.4.0...v1.4.1

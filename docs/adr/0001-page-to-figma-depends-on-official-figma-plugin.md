@@ -2,6 +2,11 @@
 
 **Status:** accepted
 
+> **Superseded in part by ADR 0006 — [0006-page-to-figma-vendored-figma-cli.md](0006-page-to-figma-vendored-figma-cli.md) (2026-06-20):**
+> page-to-figma now drives the vendored figma-cli as its primary engine; the official Figma
+> plugin documented below is retained as the *fallback* engine, not the sole hard dependency.
+> The body below is preserved as the original record.
+
 `page-to-figma` is an accuracy orchestrator that supervises the official Figma plugin's
 code→Figma build rather than reimplementing it, so it requires `figma-use`,
 `figma-generate-design`, and the `generate_figma_design` capture tool to be present. We
