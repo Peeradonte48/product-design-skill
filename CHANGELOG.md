@@ -5,6 +5,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.11.0] - 2026-06-21
+
+### Added
+- **`page-to-figma` Breakpoint mode** — responsive capture is now first-class, a sibling to
+  Flow mode. The same page at multiple viewport widths is treated as distinct designs (layout
+  *reflows*, it doesn't delta): set the Playwright viewport per breakpoint, **re-extract truth
+  at each width**, and build + full-verify one frame per breakpoint (no clone-and-delta across a
+  reflow — it would fight the structure gate). The content-hash asset dictionary is shared across
+  widths. Flow × Breakpoint compose: breakpoints are the outer axis (full build per width),
+  flow states the inner axis (delta within a width). Container-query caveat noted.
+- **`references/css-figma-map.md`** — a CSS→Figma fidelity map so the skill no longer silently
+  drops rich CSS. Covers gradients (linear/radial/conic), `filter`/`backdrop-filter` blur and
+  glassmorphism, `mix-blend-mode`, `object-fit`→`scaleMode`, `transform` (rotation maps; skew/3D
+  log+rasterize), `text-transform`→`textCase`, `text-decoration`, ellipsis/line-clamp, **mixed
+  inline runs** (one Text node with styled ranges), per-side/dashed borders, and multi/inset
+  shadows. Each row says where it's set (**JSX-direct** vs **eval-mutate** vs **log()+rasterize**)
+  and its **verify read-back**, so every built property is also asserted. Includes a
+  **color-normalization** step (1×1-canvas read-back) that converts `oklch`/P3/`color-mix`
+  (Tailwind v4 defaults) to sRGB before asserting.
+- The map is wired into the pipeline: step 1 captures the rich properties + normalizes color,
+  step 3 builds via the map, and step 4's checklist gains a **rich-properties assertion**.
+
 ## [1.10.0] - 2026-06-21
 
 ### Added
@@ -197,7 +219,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...main
+[1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...main
+[1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.6.0...v1.7.0

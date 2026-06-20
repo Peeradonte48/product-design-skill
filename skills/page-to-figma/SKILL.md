@@ -93,7 +93,7 @@ do not eyeball — mark the result **unverified** or offer to set up Playwright.
 
 ## Workflow
 
-**When a run spans multiple frames/states, prove the pipeline on ONE first.** Build one
+**When a run spans multiple frames/states/breakpoints, prove the pipeline on ONE first.** Build one
 representative frame, run the *full* verify on it (the numeric checklist, the **structure
 gate**, the **extraction-completeness gate**, and the clipping / negative-space pass in step
 4), and only then batch the rest. A
@@ -141,6 +141,37 @@ This collapses a flow from `N × (build + full-verify)` to `1 × (build + full-v
 shipped value still traces to a green checkpoint; deltas just stop re-proving what the base
 already proved.
 
+### Breakpoint mode — re-extract per width, don't delta across reflow
+
+A "breakpoint set" is the **same page at multiple viewport widths** (mobile / tablet / desktop).
+Unlike a flow's states, these are **not** near-duplicates with a small delta — the layout
+*reflows*: containers change direction, elements appear or hide (`display:none` at one width),
+sizing flips (fixed → fill), nav collapses to a hamburger. Each breakpoint is a **distinct
+design**, so treat it as a distinct frame:
+
+1. **Ask which breakpoints** (or read them from the page's own `@media` breakpoints; a common
+   default is ~360 / 768 / 1280, but don't assume — confirm). Don't transcribe a width you
+   can't observe (clarify rule).
+2. **Set the Playwright viewport explicitly per breakpoint and re-extract truth at each width**
+   (step 1). Computed styles are width-dependent — a single extraction can't be reused because
+   the numbers themselves differ. Capture each width's own section→element tree.
+3. **Build and full-verify one frame per breakpoint** (steps 3–4 — full checklist + all gates).
+   Do **not** clone-and-delta across breakpoints the way Flow mode does: a reflow changes
+   *structure*, so a delta-patch would fight the structure gate. Apply "prove on ONE first" to
+   the **primary** breakpoint (usually desktop), then build the rest.
+4. **Share the content-hash asset dictionary across breakpoints** — the images/icons are the
+   same bytes at every width (exactly what content-hash keying buys, step 3); only the layout
+   differs. Name frames by width ("Settings · 1280", "Settings · 360").
+
+A run can be **both** a flow and a breakpoint set (a 12-state flow at 3 widths). Compose them:
+breakpoints are the **outer** axis (re-extract + full build per width); within one width, the
+flow's states are the **inner** axis (clone the proven base + per-state delta). Don't cross the
+streams — delta only *within* a width, never *across* a reflow.
+
+**Container queries** respond to a container's size, not the viewport, so resizing the window
+may not trigger them. If a component reflows on its container, observe it by resizing that
+container when it's isolable, else ask.
+
 ### 1. Extract truth from the running page
 
 Open the page with Playwright. Walk the layout into a structured **section → element
@@ -149,6 +180,11 @@ tree**. For each node, record real numbers from `getComputedStyle`:
 - Fills / strokes — exact hex (and per-state, e.g. hover).
 - Box metrics — width, height, padding, margins, gaps.
 - `border-radius`, borders, shadows.
+- **Rich paint, text & color** — gradients, `filter` / `backdrop-filter` (blur / glass),
+  `mix-blend-mode`, `object-fit`, `transform`, `text-transform`, per-side / dashed borders, and
+  mixed inline text runs: capture each per `references/css-figma-map.md`, and **normalize every
+  color to sRGB** (the map's 1×1-canvas read-back) before recording — modern pages emit
+  `oklch` / P3 / `color-mix` that isn't sRGB hex and won't assert correctly raw.
 - Typography — family, size, weight, line-height, letter-spacing.
 - Box model — flex/grid direction, alignment, sizing **per container node** (this is what
   you rebuild each node as auto-layout — keep it, don't collapse the tree to a paint list).
@@ -279,6 +315,12 @@ is read/mutate only.
   equivalent. Lost cross-axis alignment is invisible to a sizes-only checklist (content sticks
   to the top/left of an over-tall/wide box, off by several px) until the position assertion
   (step 4) catches it — so build it right *and* verify it.
+- **Translate rich CSS via `references/css-figma-map.md`.** Set JSX-direct properties at render
+  time (`blur`, `bgBlur` / `glass`, `blendMode`, `rotate`, `imageScale`, `lineHeight`,
+  `letterSpacing`, `truncate` / `maxLines`); set the rest in the step-4 correction `eval` batch
+  (gradient fills, `textCase`, per-side / dashed strokes, multi/inset shadow arrays, per-range
+  inline styles); and `log()`+rasterize what has no faithful target (skew/3D transforms,
+  `border-image`). Whatever you build from the map, you also **verify** from it (step 4).
 - **Name every layer from its DOM source** — use the name captured in step 1 (`.snav-item` →
   "NavItem", `.tbl tbody tr` → "Row", `.pm-method-name` → "MethodName"). A navigable layer
   panel is free and high-value; a pile of `Frame 217`s is not a deliverable.
@@ -344,6 +386,11 @@ the design is semantically perfect — a vision gate can't terminate. Instead:
    - Colors: **exact hex**.
    - Geometry (w/h/padding/gap/radius): **±0.5px**.
    - Font family/weight: **exact**. Font size/line-height: **±0.5px**.
+   - **Rich properties (per `references/css-figma-map.md`)** — for every gradient, blur/glass,
+     blend mode, image `scaleMode`, rotation, `textCase`, `textDecoration`, per-side / dashed
+     stroke, and inline-run style you built, assert its read-back (`fills[].type`+stops,
+     `effects[]`, `blendMode`, `scaleMode`, `rotation`, `textCase`, individual stroke weights).
+     A built rich property with no assertion is a silent drop waiting to happen.
    Each property is a definite pass/fail — no subjective "close enough."
 3. **Correct every failure** with a targeted write inside **one batched `$FIGMA_CLI eval` script** that mutates the wrong nodes (mutate-existing only — not node creation, and not one `set` per fix, which would be a round-trip per correction) using the **exact extracted value** — stamp the truth on top of the plugin's output. **A position failure is fixed at the cause, not the symptom:** don't nudge the drifting node — correct the responsible ancestor (its padding / alignment / gap, or a per-child margin or centering it dropped), or for a genuinely out-of-flow node pin it with `layoutPositioning='ABSOLUTE'` at the DOM coordinate. Absolute drift almost always traces to one container collapsing its children to its edge, so fixing that ancestor re-seats the whole subtree in a single write.
 4. **Re-read the whole checklist** after each batch of corrections (not just the nodes you
@@ -423,6 +470,9 @@ improvise.
   `collections list`, `spec`, `instantiate`, `render` / `render-batch`, `create image`,
   `duplicate`, `eval` (bulk read / mutate-existing — never to create), `verify --measure` /
   `verify --save`. Full reference: the vendored `REFERENCE.md` is not shipped; rely on these.
+- **CSS → Figma fidelity map:** `references/css-figma-map.md` — how to extract, build, and
+  verify rich CSS (gradients, blur / glass, blend modes, `object-fit`, transforms,
+  `text-transform`, mixed inline runs, per-side / dashed borders, modern color → sRGB).
 - **MCP fallback:** `references/mcp-fallback.md` — used only when the CLI is unavailable
   and the user has been told (announce the rate-limited path).
 - **Browser tooling:** Playwright (or the project's equivalent) for DOM extraction and the
