@@ -5,6 +5,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.13.1] - 2026-06-22
+
+### Fixed
+- **`page-to-figma` — hardened against the failure modes from the first live run.** The
+  capture+wireflow pipeline shipped in 1.13.0 was never run end-to-end; the first real run (an
+  SPA with no routing, no Playwright MCP, headless sandbox) surfaced several gaps now closed in
+  `SKILL.md` and `references/wireflow-build.md`:
+  - **Hold the page open until the upload is confirmed received** (new `§1` step 4). The capture
+    promise resolves *before* the screenshot finishes uploading to Figma's cloud — closing the
+    page/context early silently drops the capture (it sits at `pending` forever). This was the
+    single biggest time sink in the live run.
+  - **`pending` ≠ received** (`§1` step 5). A never-submitted and a still-uploading capture both
+    report `pending`; the reliable signal is a **new ~1600px frame appearing**, audited *after* the
+    driver exits. Status polling alone can't distinguish a cut-off upload from a slow one.
+  - **No-routing SPA recipe** (new `§1b`) with a ready headless driver template. Apps with no
+    deep-linkable routes **must** drive state with Playwright then inject+fire the capture — on
+    `localhost` too; the `#figmacapture=` hash only loads a fresh page at the default state.
+  - **Playwright is now a checked, fail-closed dependency** (new `§0`; `SKILL.md` engines +
+    pipeline step 1). Prefer the Playwright MCP; if absent, stop and tell the user to install
+    `@playwright/mcp` rather than hand-locating a cached Chromium binary.
+  - **Reparent is now the primary container strategy** (`§2`). Passing the container `nodeId` to
+    `generate_figma_design` is unreliable — captures often land loose on an unrelated page — so
+    expect to scan for new frames wherever they landed and `appendChild` them.
+  - **Documented the real capture mechanism** (inject `capture.js`, call `captureForDesign` in the
+    live page) and the sandbox realities that dominated the run: one long-lived process (a new
+    shell kills background jobs), `headless: true` (headed hangs with no display),
+    `domcontentloaded` + `waitForSelector` (Vite/HMR never goes `networkidle`), and no `| head`
+    (buffering swallows stdout).
+  - **Smoke-test one screen first** — verify serializer fidelity (non-Latin scripts e.g. Thai,
+    CSS frameworks e.g. Tailwind v4) on a single screen before scaling to the whole flow.
+
 ## [1.13.0] - 2026-06-21
 
 ### Changed
@@ -270,6 +301,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...v1.11.1

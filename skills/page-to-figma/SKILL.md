@@ -27,10 +27,16 @@ related questions, but don't proceed past an unresolved ambiguity.
 ## Engines & hard dependency (fail-closed)
 
 - **Capture: Figma MCP `generate_figma_design`** — agent-invocable, headless, pixel-accurate.
-  This is a **hard, fail-closed dependency**: if it is unavailable, **stop and tell the user** —
-  there is no reconstruction fallback.
+  The capture is **driven from inside the running page** (inject Figma's `capture.js`, call
+  `captureForDesign` — `references/wireflow-build.md` §1), not a single MCP call. This is a
+  **hard, fail-closed dependency**: if unavailable, **stop and tell the user** — no reconstruction
+  fallback.
 - **Target file: Figma MCP `create_new_file` + `whoami`** — to make/resolve the design file.
-- **Page driving: Playwright** — to reach external URLs and drive states/auth before capture.
+- **Page driving: Playwright — prefer the Playwright MCP.** Reaches URLs and drives states/auth
+  before capture. **Check it up front** (`references/wireflow-build.md` §0): if there is no
+  Playwright MCP **and** no importable `playwright`/`playwright-core`, this is **fail-closed** —
+  stop and tell the user to install it (`claude mcp add playwright npx @playwright/mcp@latest`,
+  then restart). Don't hand-locate a cached Chromium binary.
 - **Arrange + arrows: vendored figma-cli `eval`** — `FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"`
   (project install) else `node ${HOME}/.claude/figma-cli/src/index.js`. Its `connect` is
   auto-run on a down daemon (announce first; see v1.12.0 behavior). The CLI is an `eval` helper
@@ -48,21 +54,31 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
 
 ## Pipeline
 
-1. **Resolve the target design file.** Use the user's existing `/design/` file, else
+1. **Verify engines first (fail-closed).** Confirm both the **Figma capture** and **Playwright**
+   (prefer the MCP) are reachable before doing anything (`references/wireflow-build.md` §0). If
+   Playwright is missing, stop and have the user install `@playwright/mcp`. Don't improvise.
+2. **Resolve the target design file.** Use the user's existing `/design/` file, else
    `create_new_file` (editorType `design`; load the `figma-create-new-file` skill first; resolve
    the plan via `whoami`). Create one **Wireflow page + container** (`references/wireflow-build.md` §2).
-2. **Establish access if the app is authed.** Default: open a headed Playwright browser, let the
-   user log in, save and reuse the session (`references/wireflow-build.md` §6). Never evade a
-   block/CAPTCHA — hand the browser to the user. Never persist secrets.
-3. **If crawl is a flow source: discover + propose the flow first** within prompted bounds
+3. **Establish access if the app is authed.** Prefer interactive login via the Playwright MCP / the
+   user's own browser, then save & reuse the session. In a **headless-only sandbox** a headed login
+   browser hangs — fall back to a user-provided `storageState` (`references/wireflow-build.md` §6).
+   Never evade a block/CAPTCHA — hand the browser to the user. Never persist secrets.
+4. **If crawl is a flow source: discover + propose the flow first** within prompted bounds
    (same-origin, path-prefix, depth 3, ~20 screens), label edges from the observed trigger, and
    get the user to confirm the graph before capturing (`references/wireflow-build.md` §7).
-4. **Capture each screen/state** into the container, polling to `completed`; rename each frame to
-   its screen name. Granularity is whatever the **flow source enumerates** — never invent states;
-   reach states via Playwright before capturing (`references/wireflow-build.md` §1).
-5. **Arrange** the frames — **lanes + branch drop-rows**, full size, generous gutters
+5. **Smoke-test ONE screen, then capture the rest.** Reach each state with Playwright, inject the
+   capture, fire it, and **keep the page open until the upload is confirmed received** — the
+   capture promise resolves *before* the upload finishes; closing early silently drops it
+   (`references/wireflow-build.md` §1). Confirm a capture landed by a **new frame appearing**, not
+   by `pending` status. For apps with **no deep-linkable routes**, drive state with Playwright even
+   on localhost (`references/wireflow-build.md` §1b). Run all screens in **one process** and don't
+   touch the shell until it exits (§0). Capture **one** screen and check fidelity (fonts, non-Latin
+   scripts, CSS framework) before scaling to the whole flow. Never invent states; rename each frame
+   to its screen name.
+6. **Arrange** the frames — **lanes + branch drop-rows**, full size, generous gutters
    (`references/wireflow-build.md` §3).
-6. **Draw labeled arrows** for each transition — orthogonal VECTOR + arrow `strokeCap` + Inter
+7. **Draw labeled arrows** for each transition — orthogonal VECTOR + arrow `strokeCap` + Inter
    label, via `eval` (`references/wireflow-build.md` §4). Arrows are **static** (they don't
    reroute if frames move). Read-back-check each arrow connects the intended frames.
 
