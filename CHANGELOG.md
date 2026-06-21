@@ -5,6 +5,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.13.0] - 2026-06-21
+
+### Changed
+- **`page-to-figma` is now a capture + wireflow skill — the page-reconstruction engine is gone.**
+  Instead of extracting computed styles and rebuilding a nested auto-layout tree (which kept
+  mismatching — position drift, passes-checks-but-looks-wrong, missing content), it now captures
+  each screen with Figma's **native** `generate_figma_design` (agent-invocable, headless,
+  pixel-accurate), arranges the captured frames (lanes + branch drop-rows), and connects them with
+  labeled arrows into a **wireflow**. Flow connections come from three optional, combinable
+  sources — an explicit list, a FigJam/UCN, or a **bounded crawl** that proposes a graph for the
+  user to confirm. Auth defaults to interactive user login + session reuse (the agent never
+  handles the password, never evades blocks, never persists secrets).
+
+### Removed
+- The reconstruction machinery: the computed-style walk, nested-auto-layout build contract,
+  numeric read-back verify + correct-until-green loop, structure/clipping/extraction-completeness
+  gates, and the `references/css-figma-map.md` and `references/mcp-fallback.md` files.
+
+### Dependencies
+- **Figma MCP capture (`generate_figma_design`) is now a hard, fail-closed dependency** (was a
+  fallback). With reconstruction gone there is no degraded mode — the skill stops if it is
+  unavailable. The vendored figma-cli survives only as an `eval` helper for arrange + arrows.
+
+See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, updates ADR 0001).
+
 ## [1.12.0] - 2026-06-21
 
 ### Changed
@@ -245,7 +270,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...main
+[1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
+[1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...v1.10.0

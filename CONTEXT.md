@@ -49,3 +49,12 @@ EARS requirements (with IDs), a design section, and an ordered task list. Its so
 design, and it describes *what an AI developer must build and in what order*. Distinct from the
 Product spec above by source (frame vs sitemap) and shape (requirements/design/tasks vs page specs).
 _Avoid_: spec (bare), product spec
+
+**Wireflow**:
+The output of `page-to-figma` — a single Figma **design** page holding pixel-accurate **captured**
+screen frames (Figma's native page-capture, *not* a hand reconstruction) arranged in flow order and
+joined by labeled arrows showing transitions. Its **nodes are defined by the flow source** (user
+list / FigJam / crawl), never invented by the skill. Distinct from a *Use-case narrative* (a
+markdown behavioral doc) and a *Product spec* / sitemap (a page tree): a Wireflow is the visual,
+captured-screen-plus-arrows artifact.
+_Avoid_: flow diagram (bare), sitemap, use-case narrative
