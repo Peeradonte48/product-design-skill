@@ -52,14 +52,22 @@ output for accuracy. Invoke it by absolute path; define this once at the start o
 Prefer the project copy (`./.claude/figma-cli/src/index.js`) when it exists, else the user
 copy (`~/.claude/figma-cli/src/index.js`).
 
-### Connection & consent — never patch Figma silently
+### Connection — announce, then auto-connect
 
-1. Check `$FIGMA_CLI daemon status`. If connected, proceed.
-2. If it is **down**, STOP and ask the user to connect — explain the two modes in plain
-   terms: **Yolo** (`$FIGMA_CLI connect`) applies a small reversible patch to Figma Desktop
-   for a hands-off connection; **Safe** (`$FIGMA_CLI connect --safe`) uses a plugin bridge
-   and patches nothing. **Never auto-run `connect`** — patching the user's Figma is their
-   decision, not a silent side-effect of this skill.
+1. Check `$FIGMA_CLI daemon status`. If already connected, proceed silently.
+2. If it is **down**, **auto-connect** — don't make the user run a command. First **announce
+   one line** ("Connecting figma-cli to Figma Desktop — this applies a small, reversible
+   one-time patch so the CLI can drive it locally"), then run `$FIGMA_CLI connect` (Yolo
+   mode). The patch is reversible (`$FIGMA_CLI unpatch` reverts it) and
+   **persists**, so this cost is paid at most once per machine; every later run finds the
+   daemon already connected at step 1. Announce, but **do not block on a prompt** — the user
+   asked for hands-off connection.
+   - **If `connect` fails** (most often macOS **Full Disk Access** not granted to the
+     terminal, or no Figma Desktop running): **stop and surface it.** Relay the CLI's own
+     fix-it steps (grant Full Disk Access, then retry), and offer the two fallbacks —
+     **Safe mode** (`$FIGMA_CLI connect --safe`, patches nothing but needs the user to
+     launch the FigCli plugin in Figma's UI) or the **Figma MCP path** below. Never loop on
+     a failing `connect`.
 3. Confirm the **target file** before the first write: run `$FIGMA_CLI files` / `$FIGMA_CLI
    canvas info`. The CLI builds into whatever Figma Desktop file is focused (it has no
    per-node URL targeting). If more than one file is open or the active page is ambiguous,
@@ -465,8 +473,9 @@ improvise.
 ## Helpful resources
 
 - **Vendored figma-cli (primary engine):** `node ~/.claude/figma-cli/src/index.js` (or the
-  project copy under `./.claude/figma-cli/`). Key verbs: `daemon status`, `connect` /
-  `connect --safe` (user-run only), `files`, `canvas info`, `variables list`,
+  project copy under `./.claude/figma-cli/`). Key verbs: `daemon status`, `connect`
+  (auto-run on a down daemon, after a one-line announce) / `connect --safe` (fallback,
+  user launches the plugin), `files`, `canvas info`, `variables list`,
   `collections list`, `spec`, `instantiate`, `render` / `render-batch`, `create image`,
   `duplicate`, `eval` (bulk read / mutate-existing — never to create), `verify --measure` /
   `verify --save`. Full reference: the vendored `REFERENCE.md` is not shipped; rely on these.
