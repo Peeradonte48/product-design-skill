@@ -42,10 +42,17 @@ related questions, but don't proceed past an unresolved ambiguity.
   `browser_run_code_unsafe`). It's **blocked by default and the agent can't self-grant it** — the
   user must allow it in the target project's `.claude/settings.local.json` **before** capturing
   (`references/wireflow-build.md` §0).
-- **Arrange + arrows: vendored figma-cli `eval`** — `FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"`
-  (project install) else `node ${HOME}/.claude/figma-cli/src/index.js`. Its `connect` is
-  auto-run on a down daemon (announce first; see v1.12.0 behavior). The CLI is an `eval` helper
-  here, not a build engine.
+- **Node ops (container / reparent / arrange / connect): prefer `use_figma`** (Figma MCP Plugin
+  API — load the `figma-use` skill first; async API; atomic, batch ~5–6 ops/call). It's the same
+  MCP bridge already required above, so no new dependency. The vendored **figma-cli `eval`**
+  (`FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"` else `${HOME}/...`) is a **fallback**
+  only — its local CDP bridge can fail outright (error -600); don't depend on it
+  (`references/wireflow-build.md` §0).
+- **Arrows: magnetic FigJam connectors (primary), static VECTOR (fallback).** Connectors can't be
+  *created* in a `/design/` file, but a connector **pasted from FigJam survives** and is cloned +
+  re-pointed per edge → real snapping, auto-rerouting arrows (`references/wireflow-build.md` §4).
+  This needs a one-time human **donor** paste; if the user declines, fall back to static VECTOR
+  arrows (§4b). The donor's style propagates to every clone.
 
 All concrete recipes (capture+poll, one-page container, arrange math, the arrow `eval`,
 placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow it exactly.
@@ -66,7 +73,9 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
    denied by default and the agent can't self-grant it. If it's blocked, **walk the user through
    the grant in plain language, step by step (assume they're not technical), and wait** — don't
    just print a tool name. Use the ready-to-relay script in `references/wireflow-build.md` §0. Do
-   this now, not 4 screens in.
+   this now, not 4 screens in. **Also offer the magnetic-arrow setup now** — ask the user to paste
+   one FigJam **donor** connector and send its link (§0/§4) so it's ready by the time you connect;
+   if they decline, you'll use static VECTOR arrows (§4b).
 2. **Resolve the target design file.** Use the user's existing `/design/` file, else
    `create_new_file` (editorType `design`; load the `figma-create-new-file` skill first; resolve
    the plan via `whoami`). Create one **Wireflow page + container** (`references/wireflow-build.md` §2).
@@ -87,16 +96,17 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
 6. **Build incrementally — capture → place → connect, one screen at a time** (default, Playwright
    MCP path). Walk the flow in order; for each screen: capture it (**fire the in-page capture, don't
    `await` it** — then poll for the frame to confirm it landed), place it in its lane slot (**lanes +
-   branch drop-rows**, full size — §3), then **draw the labeled arrow from its predecessor**
-   (orthogonal VECTOR + arrow `strokeCap` + Inter label — §4) and read-back-check it. Repeat. This
-   leaves a *connected* partial flow if a run dies and lets you verify each link as you go. The MCP
-   browser persists across shell commands, so interleaving captures and arrow `eval`s is fine
-   (`references/wireflow-build.md` §8). Rename each frame to its screen name. Arrows are **static**.
+   branch drop-rows**, full size — §3), then **connect it to its predecessor with a magnetic
+   connector** (clone the donor + magnets + label — §4; static VECTOR if no donor — §4b) and
+   read-back-check it. Repeat. This leaves a *connected* partial flow if a run dies and lets you
+   verify each link as you go. The MCP browser persists across shell commands, so interleaving
+   captures and `use_figma` ops is fine (`references/wireflow-build.md` §8). Rename each frame to its
+   screen name. Magnetic connectors **auto-reroute** when frames move (VECTOR arrows don't).
    **Bound every wait and emit progress** — a capture running long with **no output is a hang, not
    slowness**; localize it (`references/wireflow-build.md` §9), never sit silently.
 7. **Batch fallback (no Playwright MCP).** With only the Bash node-driver, a stray shell command
    kills the capture driver (§0), so you can't interleave — capture all screens in one process,
-   then arrange (§3) and draw all arrows (§4) after it exits (`references/wireflow-build.md` §8).
+   then arrange (§3) and connect all edges (§4/§4b) after it exits (`references/wireflow-build.md` §8).
 
 ## Flow sources (three, optional, combinable)
 
@@ -112,10 +122,11 @@ When more than one is given, the explicit list / FigJam / UCN win; crawl only fi
 
 Fidelity is Figma's capture's responsibility. Check only coverage + wiring:
 
-- Every flow node produced a **completed** capture + a named frame; arrows connect the intended
-  frames (read-back per `references/wireflow-build.md` §4).
+- Every flow node produced a **completed** capture + a named frame; every edge connects the intended
+  frames (read-back per `references/wireflow-build.md` §4 — for a magnetic connector assert
+  `type === "CONNECTOR"` + endpoint ids; for a VECTOR assert endpoints + a non-`NONE` arrowhead).
 - **Failed captures:** retry **once**; if still failing, drop a loud labeled **placeholder**
-  (`⚠ Capture failed: <screen> — <reason>`) in its slot, still draw its arrows, continue, and
+  (`⚠ Capture failed: <screen> — <reason>`) in its slot, still connect its edges, continue, and
   **list every failure at the end** for the user to retry (`references/wireflow-build.md` §1, §5).
 - **Re-run:** a full re-run builds a **new** board and leaves any prior one untouched (no
   destructive mutation); only a failure-retry patches a placeholder in the current board.
