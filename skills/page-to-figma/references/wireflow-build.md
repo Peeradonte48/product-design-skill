@@ -14,6 +14,50 @@ These are the things a real run will fail on if you skip them. Check §0 first.
   `claude mcp add playwright npx @playwright/mcp@latest` (then restart the session). Do **not**
   improvise a driver by hand-locating a cached Chromium binary; that is the slow, fragile path the
   MCP exists to avoid. With the MCP present, the whole drive-then-capture flow is trivial.
+- **Pre-authorize the in-page code-execution tool — the most common hard block.** Capture *must*
+  run Figma's `capture.js` inside the live page (§1 step 3), so it needs a tool that executes
+  arbitrary JS in the page, and those are **denied by default**. The agent **cannot self-grant**
+  it (a classifier blocks even the attempt to add the permission) — only the user can. So confirm
+  it's allowed **before** capturing; being blocked partway in wastes the whole run.
+
+  **Walk the user through the grant — assume they are not technical.** Don't just print a tool
+  name. When the tool is blocked (or up front, in step 1 of the pipeline), tell the user, in plain
+  language, something like this and **wait** for them to confirm before retrying:
+
+  > To copy your page into Figma I need a one-time permission: to run Figma's capture script inside
+  > your app's browser tab. Your setup blocks that by default and I'm not allowed to turn it on
+  > myself — you have to. It takes ~20 seconds:
+  >
+  > 1. In **this project's** folder, open the file `.claude/settings.local.json`.
+  >    (If it doesn't exist, create it with the full contents shown below.)
+  > 2. Add `"mcp__playwright__browser_run_code_unsafe"` to the `permissions.allow` list.
+  > 3. Save the file. If I still can't proceed right after, restart this session so it loads.
+  > 4. Tell me "continue".
+  >
+  > File doesn't exist yet — paste this whole thing in:
+  > ```json
+  > { "permissions": { "allow": ["mcp__playwright__browser_run_code_unsafe"] } }
+  > ```
+  > File already exists — just add the line inside the existing `allow` array:
+  > ```json
+  > { "permissions": { "allow": [ "...your existing entries...",
+  >   "mcp__playwright__browser_run_code_unsafe" ] } }
+  > ```
+  > This only lets me run Figma's own capture script in your own app to send it to your own Figma —
+  > exactly what this command does. It's safe to leave on for this; you can remove the line later.
+
+  - **The user must make the change — don't assume you can.** A live run showed the guard also
+    blocks the agent from *adding the permission rule itself*, so don't promise to "just do it" and
+    then dead-end. You may *offer* to edit the file if they ask, but if that edit is blocked, fall
+    back to walking them through the manual steps above. The human grants; you guide.
+  - **Bash node-driver path (§1b):** needs Bash + an importable `playwright`/`playwright-core`; it
+    runs the same in-page JS via `page.addScriptTag` + `page.evaluate`, so it may hit its own
+    guard. Not a way to dodge the permission — just a different gate.
+
+  The grant is reasonable for this skill (it runs Figma's *first-party* capture script in the
+  user's *own* app and uploads to Figma's cloud — exactly what `page-to-figma` does), but it is a
+  real arbitrary-code capability, so present it as a conscious, scoped grant — don't enable it for
+  untrusted work.
 - **One long-lived process per run.** A capture upload continues *after* the JS promise resolves
   (§1 step 4). In many agent sandboxes **starting a new shell command kills still-running
   background jobs**, which cuts off in-flight uploads. So drive **all** screens inside **one**
