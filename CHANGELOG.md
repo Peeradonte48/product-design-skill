@@ -398,13 +398,13 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.15.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
-[1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
+[1.15.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
+[1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
 [1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...v1.11.0
