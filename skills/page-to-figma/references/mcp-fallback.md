@@ -1,7 +1,8 @@
 # MCP fallback path (page-to-figma)
 
 Use this path **only** when the primary figma-cli engine is unavailable and the user
-has been told (see SKILL.md "Connection & consent"). This is the suite's prior behavior,
+has been told (see SKILL.md "Connection — announce, then auto-connect", reached only after an
+auto-`connect` attempt fails). This is the suite's prior behavior,
 frozen here. Announce to the user that you are on the **rate-limited Figma MCP path** and
 that the verify loop may throttle; offer the figma-cli fast path.
 

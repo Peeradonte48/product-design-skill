@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.12.0] - 2026-06-21
+
+### Changed
+- **`page-to-figma` now auto-connects the figma-cli** instead of stopping to make the user
+  run `connect` by hand. On a down daemon the skill announces one line ("Connecting
+  figma-cli to Figma Desktop — small, reversible one-time patch") and then runs
+  `$FIGMA_CLI connect` (Yolo mode) itself — no blocking prompt. The patch is reversible and
+  persists, so the cost is paid at most once per machine; later runs find the daemon already
+  connected. If `connect` fails (e.g. macOS Full Disk Access not granted, or no Figma
+  Desktop open) the skill **stops and surfaces the fix**, then offers the Safe-mode
+  (`connect --safe`, plugin-launched-by-user) or Figma-MCP fallbacks — it never silently
+  degrades and never loops on a failing connect. This replaces the prior
+  "never auto-run `connect`" consent gate, per user feedback that the manual step was
+  friction. (`references/mcp-fallback.md` and the Helpful-resources verb list updated to match.)
+
 ## [1.11.1] - 2026-06-21
 
 ### Fixed
@@ -230,7 +245,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...main
+[1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...main
+[1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...v1.9.0
