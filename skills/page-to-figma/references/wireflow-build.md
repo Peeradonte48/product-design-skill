@@ -3,29 +3,127 @@
 Concrete recipes the skill calls. `$FIGMA_CLI` is the vendored CLI
 (`node ~/.claude/figma-cli/src/index.js`, or the project copy).
 
+## 0. Driver prerequisites & environment (check before any capture)
+
+These are the things a real run will fail on if you skip them. Check §0 first.
+
+- **Playwright is a hard, fail-closed dependency. Prefer a Playwright MCP.** It runs in the
+  user's environment and can open a headed browser for login. **Check for it up front.** If there
+  is no Playwright MCP **and** no importable `playwright` / `playwright-core` on a reachable path,
+  **stop and tell the user to install it** —
+  `claude mcp add playwright npx @playwright/mcp@latest` (then restart the session). Do **not**
+  improvise a driver by hand-locating a cached Chromium binary; that is the slow, fragile path the
+  MCP exists to avoid. With the MCP present, the whole drive-then-capture flow is trivial.
+- **One long-lived process per run.** A capture upload continues *after* the JS promise resolves
+  (§1 step 4). In many agent sandboxes **starting a new shell command kills still-running
+  background jobs**, which cuts off in-flight uploads. So drive **all** screens inside **one**
+  process and **do not run any other shell command until it self-exits**. This also means you
+  generally **cannot** poll the Figma file mid-run (that `eval`/MCP call is a new shell that would
+  kill the driver) — confirm landings *after* the driver exits (§1 step 5).
+- **Headless in a sandbox.** A headed Chromium hangs where there is no display. Use
+  `headless: true` for the capture driver; reserve headed mode for interactive login via the MCP
+  or the user's own browser (§6).
+- **Dev servers never go `networkidle`.** Vite/HMR keeps a websocket open, so
+  `waitUntil: 'networkidle'` **never resolves** and hangs the driver. Use
+  `waitUntil: 'domcontentloaded'` then `waitForSelector(<app root>)`.
+- **Don't pipe driver stdout through `| head`** — buffering can swallow it all. Write progress to
+  a file instead (the template in §1b does this).
+
 ## 1. Capture one screen
 
-`generate_figma_design` is agent-invocable and headless. Per screen:
+The capture is **driven from inside the running page** (not a single MCP call): you inject Figma's
+`capture.js` and call `captureForDesign` in the live page. Per screen:
 
-1. Reach the exact state first (Playwright): navigate to the URL/route and drive any
-   interaction (open the modal, submit the form) so the live page shows the state to capture.
-2. Call `generate_figma_design` with the target `fileKey` **and the wireflow container
-   `nodeId`** (so every capture lands on one page — see §2). No `captureId` on the first call.
-3. Poll: call again with the returned `captureId` **every 5 seconds, up to 10 times**, until
-   `status: completed`. Each `captureId` is single-use.
-4. On `completed`, find the new frame: enumerate the container's children
-   (`$FIGMA_CLI eval 'figma.getNodeById("<containerId>").children.map(c=>({id:c.id,name:c.name}))'`
-   or `get_metadata`) and take the newly-added frame. Rename it to the screen name.
+1. **Get a capture handle.** Call `generate_figma_design` with the target `fileKey` (and the
+   wireflow container `nodeId`, §2) and **no** `captureId`. It returns a `captureId`, an
+   `endpoint`, and an injectable **`capture.js`**.
+2. **Reach the exact state (Playwright).** Navigate (`domcontentloaded` + `waitForSelector`, §0)
+   and drive any interaction (open the modal, switch tab, submit) so the live page shows the state.
+   Apps **without deep-linkable routes must** drive state this way — see §1b.
+3. **Inject + fire.** Inject `capture.js` into the page, then call
+   `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })` (or a tighter
+   selector for a sub-region).
+4. **Hold the page open until the upload is confirmed received.** ⚠️ **CRITICAL.**
+   `captureForDesign` resolves **before** the screenshot finishes uploading to Figma's cloud.
+   **Closing the page/context now silently drops the capture** — it sits at `pending` forever and
+   no frame ever lands. Do **not** close on promise-resolve. Either `await` a true completion
+   signal if the capture API exposes one, or hold each screen open with a generous in-process wait
+   (seconds, not ~0.5s) before moving on. Only `browser.close()` after **every** screen is done.
+5. **Confirm by new frames — after the driver exits.** `pending` is **ambiguous**: a
+   never-submitted capture and a still-uploading one both report `pending`, so status polling alone
+   can't tell a cut-off upload from a slow one. The reliable signal is a **new ~1600px frame**
+   appearing. Because polling mid-run would kill the driver (§0), do the audit *after* it exits:
+   enumerate the container's (and the file's) frames
+   (`$FIGMA_CLI eval 'figma.getNodeById("<containerId>").children.map(c=>({id:c.id,name:c.name,w:c.width}))'`
+   or `get_metadata`) and match each expected screen to a newly-added frame. Rename matched frames
+   to their screen names.
 
-**Failure:** if polling exhausts (10×) or the call errors, **retry the whole capture once**.
-If it still fails, create a placeholder in its slot (§4) and record the failure for the
-end-of-run report. Never silently drop it.
+**Smoke-test ONE screen first.** The native serializer can mis-render non-Latin scripts (e.g.
+Thai) and some CSS frameworks (e.g. Tailwind v4). Capture **one** screen and eyeball fidelity
+**before** scaling to the whole flow — a serializer gap is far cheaper to catch on screen 1 than
+on screen 6.
+
+**Failure:** any expected screen with **no** matching frame after the run → **retry just those
+screens once** (a second driver pass). If a screen still produces no frame, create a placeholder
+in its slot (§5) and record the failure for the end-of-run report. Never silently drop it.
+
+## 1b. No-routing SPA recipe (drive-then-capture, even on localhost)
+
+Apps with **no deep-linkable routes** — every screen is the same URL with internal React/Vue
+state — **cannot** be reached by opening a URL with a `#figmacapture=` hash; that loads a fresh
+page at the default state and can never show "sheet open, Branches tab, override sub-sheet." For
+these the **only** path is: drive the state with Playwright, then inject + fire the capture in that
+same live page (§1). **This applies on `localhost` too** — there is no localhost shortcut.
+
+Driver template — headless, one process, all screens, progress to a file. Adjust selectors per app:
+
+```js
+// node driver.js  — runs ALL captures in ONE process; never touch the shell until it exits (§0)
+const { chromium } = require('playwright'); // or 'playwright-core'
+const fs = require('fs');
+const log = (m) => fs.appendFileSync('capture.log', m + '\n');
+
+// One entry per screen. `drive(page)` leaves the page ON the state to capture.
+// `captureId` / `endpoint` come from one generate_figma_design call per screen (§1 step 1).
+const SCREENS = [
+  { name: '01 Home',         captureId: '...', endpoint: '...', drive: async (p) => {} },
+  { name: '02 Method sheet', captureId: '...', endpoint: '...',
+    drive: async (p) => {
+      await p.click('button.snav-item:has-text("Payment")');
+      await p.waitForSelector('.sheet[data-screen-label="02 Method definition"]');
+    } },
+  // ... a sub-sheet that REPLACES its parent shares one scrim, does not stack — drive it the same way
+];
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });          // headless (§0)
+  const ctx = await browser.newContext(/* { storageState: 'state.json' } if authed (§6) */);
+  const page = await ctx.newPage();
+  await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' }); // not networkidle (§0)
+  await page.waitForSelector('#root');                                 // app root
+
+  for (const s of SCREENS) {
+    await s.drive(page);
+    await page.addScriptTag({ path: 'capture.js' });                   // Figma's capture.js (§1 step 1)
+    await page.evaluate(({ captureId, endpoint }) =>
+      window.figma.captureForDesign({ captureId, endpoint, selector: 'body' }),
+      { captureId: s.captureId, endpoint: s.endpoint });
+    log('fired ' + s.name);
+    await page.waitForTimeout(10000);  // HOLD so the upload finishes (§1 step 4). Do NOT close early.
+  }
+  await browser.close();               // only after ALL screens fired + held
+  log('done');
+})();
+```
+
+Fetch all the per-screen `captureId`/`endpoint` handles **first** (one `generate_figma_design`
+call each, §1 step 1), then run the driver once over all screens. After it exits, audit which
+frames landed (§1 step 5) and retry any that didn't.
 
 ## 2. One page, one container
 
-Captures default to a **new page per call** unless a `nodeId` is passed. A wireflow needs all
-screens on one page, so before capturing, create one wireflow page + a container frame and pass
-its id to every capture:
+A wireflow needs all screens on **one** page. Before capturing, create one wireflow page +
+a container frame:
 
 ```bash
 $FIGMA_CLI eval '(function(){
@@ -37,8 +135,15 @@ $FIGMA_CLI eval '(function(){
 })()'
 ```
 
-**Fallback** if a capture still lands on its own page: reparent it onto the container —
-`figma.getNodeById("<containerId>").appendChild(figma.getNodeById("<frameId>"))`.
+**Reparent is the primary strategy — passing the container `nodeId` to `generate_figma_design` is
+unreliable.** Captures frequently still land **loose on an unrelated page** even when the `nodeId`
+is supplied. So: still pass the `nodeId` (it helps when it works), but **expect to reparent**.
+After each capture lands (§1 step 5), locate the new frame by scanning for recently-added ~1600px
+frames **wherever they landed** (not only inside the container), then move it onto the container —
+
+```bash
+$FIGMA_CLI eval 'figma.getNodeById("<containerId>").appendChild(figma.getNodeById("<frameId>"))'
+```
 
 ## 3. Arrange — lanes + branch drop-rows
 
@@ -111,6 +216,11 @@ $FIGMA_CLI eval '(async function(){
 ```
 
 ## 6. Auth (default: interactive login, reuse session)
+
+Interactive login needs a **headed** browser, which only works via a **Playwright MCP** or the
+**user's own browser** — **not** in a headless-only agent sandbox (§0), where a headed browser
+hangs. If you're headless-only, skip steps 1–2 and use the user-provided `storageState` fallback
+below.
 
 1. Open a **headed** Playwright browser at the login URL; **pause** and ask the user to log in
    (they handle MFA / SSO / CAPTCHA).
