@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.14.0] - 2026-06-22
+
+### Changed
+- **`page-to-figma` now builds the wireflow incrementally — capture → place → connect, one screen
+  at a time** (new `§8`; replaces the old bulk-capture-then-arrange-then-arrow ordering as the
+  default). It walks the confirmed flow graph and, for each screen, captures it, places it in its
+  precomputed lane slot, and draws the labeled arrow to any already-placed neighbor before moving
+  on. Benefits: a run that dies partway leaves a **connected partial flow** instead of a pile of
+  loose captures, and each link is verifiable as it's drawn.
+  - This is possible because, on the **Playwright MCP path**, the browser session lives in the MCP
+    server and survives shell commands — so captures and arrow `eval`s can interleave, and each
+    capture can be confirmed *immediately* (not only after a batch driver exits).
+  - The old **bulk/one-process** flow is retained strictly as the **no-MCP Bash node-driver
+    fallback**, where a stray shell command would kill the capture driver mid-run. `§0` and `§1`
+    now scope the "one long-lived process" / "confirm after exit" rules to that path only.
+
 ## [1.13.3] - 2026-06-22
 
 ### Fixed
@@ -339,6 +355,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main

@@ -77,20 +77,24 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
 4. **If crawl is a flow source: discover + propose the flow first** within prompted bounds
    (same-origin, path-prefix, depth 3, ~20 screens), label edges from the observed trigger, and
    get the user to confirm the graph before capturing (`references/wireflow-build.md` §7).
-5. **Smoke-test ONE screen, then capture the rest.** Reach each state with Playwright, inject the
-   capture, fire it, and **keep the page open until the upload is confirmed received** — the
-   capture promise resolves *before* the upload finishes; closing early silently drops it
-   (`references/wireflow-build.md` §1). Confirm a capture landed by a **new frame appearing**, not
-   by `pending` status. For apps with **no deep-linkable routes**, drive state with Playwright even
-   on localhost (`references/wireflow-build.md` §1b). Run all screens in **one process** and don't
-   touch the shell until it exits (§0). Capture **one** screen and check fidelity (fonts, non-Latin
-   scripts, CSS framework) before scaling to the whole flow. Never invent states; rename each frame
-   to its screen name.
-6. **Arrange** the frames — **lanes + branch drop-rows**, full size, generous gutters
-   (`references/wireflow-build.md` §3).
-7. **Draw labeled arrows** for each transition — orthogonal VECTOR + arrow `strokeCap` + Inter
-   label, via `eval` (`references/wireflow-build.md` §4). Arrows are **static** (they don't
-   reroute if frames move). Read-back-check each arrow connects the intended frames.
+5. **Smoke-test ONE screen first.** Reach the state with Playwright, inject the capture, fire it,
+   and **keep the page open until the upload is confirmed received** — the capture promise resolves
+   *before* the upload finishes; closing early silently drops it (`references/wireflow-build.md`
+   §1). Confirm it landed by a **new frame appearing**, not by `pending` status. For apps with **no
+   deep-linkable routes**, drive state with Playwright even on localhost (§1b). Check fidelity
+   (fonts, non-Latin scripts, CSS framework) on this one screen **before scaling**. Never invent
+   states.
+6. **Build incrementally — capture → place → connect, one screen at a time** (default, Playwright
+   MCP path). Walk the flow in order; for each screen: capture it (hold until it lands, confirm the
+   frame), place it in its lane slot (**lanes + branch drop-rows**, full size — §3), then **draw the
+   labeled arrow from its predecessor** (orthogonal VECTOR + arrow `strokeCap` + Inter label — §4)
+   and read-back-check it. Repeat. This leaves a *connected* partial flow if a run dies and lets you
+   verify each link as you go. The MCP browser persists across shell commands, so interleaving
+   captures and arrow `eval`s is fine (`references/wireflow-build.md` §8). Rename each frame to its
+   screen name. Arrows are **static** (they don't reroute if frames move).
+7. **Batch fallback (no Playwright MCP).** With only the Bash node-driver, a stray shell command
+   kills the capture driver (§0), so you can't interleave — capture all screens in one process,
+   then arrange (§3) and draw all arrows (§4) after it exits (`references/wireflow-build.md` §8).
 
 ## Flow sources (three, optional, combinable)
 

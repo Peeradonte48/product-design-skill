@@ -67,12 +67,14 @@ These are the things a real run will fail on if you skip them. Check §0 first.
   user's *own* app and uploads to Figma's cloud — exactly what `page-to-figma` does), but it is a
   real arbitrary-code capability, so present it as a conscious, scoped grant — don't enable it for
   untrusted work.
-- **One long-lived process per run.** A capture upload continues *after* the JS promise resolves
-  (§1 step 4). In many agent sandboxes **starting a new shell command kills still-running
-  background jobs**, which cuts off in-flight uploads. So drive **all** screens inside **one**
-  process and **do not run any other shell command until it self-exits**. This also means you
-  generally **cannot** poll the Figma file mid-run (that `eval`/MCP call is a new shell that would
-  kill the driver) — confirm landings *after* the driver exits (§1 step 5).
+- **One long-lived process per run — *Bash node-driver path only*.** A capture upload continues
+  *after* the JS promise resolves (§1 step 4). On the **Bash node-driver path**, many agent
+  sandboxes **kill still-running background jobs when a new shell command starts**, cutting off
+  in-flight uploads — so there you must drive **all** screens inside **one** process, run no other
+  shell command until it exits, and confirm landings *after* it exits (you can't poll mid-run).
+  **On the Playwright MCP path this does not apply:** the browser session lives in the MCP server
+  and survives shell commands, so you capture **one screen at a time** and interleave arrow `eval`s
+  — the incremental default (§8).
 - **Headless in a sandbox.** A headed Chromium hangs where there is no display. Use
   `headless: true` for the capture driver; reserve headed mode for interactive login via the MCP
   or the user's own browser (§6).
@@ -102,14 +104,15 @@ The capture is **driven from inside the running page** (not a single MCP call): 
    no frame ever lands. Do **not** close on promise-resolve. Either `await` a true completion
    signal if the capture API exposes one, or hold each screen open with a generous in-process wait
    (seconds, not ~0.5s) before moving on. Only `browser.close()` after **every** screen is done.
-5. **Confirm by new frames — after the driver exits.** `pending` is **ambiguous**: a
-   never-submitted capture and a still-uploading one both report `pending`, so status polling alone
-   can't tell a cut-off upload from a slow one. The reliable signal is a **new ~1600px frame**
-   appearing. Because polling mid-run would kill the driver (§0), do the audit *after* it exits:
-   enumerate the container's (and the file's) frames
+5. **Confirm by new frames (not by status).** `pending` is **ambiguous**: a never-submitted capture
+   and a still-uploading one both report `pending`, so status polling alone can't tell a cut-off
+   upload from a slow one. The reliable signal is a **new ~1600px frame** appearing — enumerate the
+   container's (and the file's) frames
    (`$FIGMA_CLI eval 'figma.getNodeById("<containerId>").children.map(c=>({id:c.id,name:c.name,w:c.width}))'`
-   or `get_metadata`) and match each expected screen to a newly-added frame. Rename matched frames
-   to their screen names.
+   or `get_metadata`) and match each expected screen to a newly-added frame; rename matched frames.
+   **MCP path:** confirm each screen **immediately** (the browser isn't a shell job, so an `eval`
+   won't kill it) — this is what makes the incremental build (§8) possible. **Bash node-driver
+   path:** you can't poll mid-run (§0), so do this audit *after* the driver exits.
 
 **Smoke-test ONE screen first.** The native serializer can mis-render non-Latin scripts (e.g.
 Thai) and some CSS frameworks (e.g. Tailwind v4). Capture **one** screen and eyeball fidelity
@@ -295,3 +298,31 @@ nav only (never click delete/pay/submit-like actions — ask for a recipe instea
 edge's trigger from the observed click (visible text / selector / resulting URL, e.g.
 `click "Checkout"`); an edge you can't label is surfaced for the user to name, never invented.
 Emit a **proposed** graph and get user confirmation **before** any capture or arrow.
+
+## 8. Incremental build — capture → place → connect, one screen at a time (default)
+
+On the **Playwright MCP path** the browser session lives in the MCP server and survives shell
+commands (§0), so don't batch. Build the wireflow **incrementally** — capture one screen, place it,
+connect it, then move on. It's more robust (a mid-run failure leaves a *connected* partial flow,
+not a pile of loose captures) and lets you verify each link as you go.
+
+1. **Confirm the flow graph first** (Flow sources / §7) and **precompute each node's lane slot**
+   from the graph (§3) — expected `x`/`y` using the full capture width (~1600px; refine once real
+   widths land). You know the whole graph up front, so the layout is deterministic.
+2. **Walk the flow in order.** For each node the walk reaches:
+   a. **Capture it** (§1) — reach the state, inject + fire, **hold until the upload lands**, then
+      confirm the new frame **immediately** (MCP browser isn't a shell job, so an `eval` won't kill
+      it — §1 step 5).
+   b. **Reparent + place** it: `appendChild` onto the container (§2) and set its `x`/`y` to its
+      precomputed slot (§3).
+   c. **Draw every edge whose *both* endpoints are now placed** (§4) with the edge label, and
+      read-back-check each. Usually that's the arrow from the just-captured node's predecessor, but
+      doing it by "both endpoints placed" also closes **merges** and **back-edges** correctly.
+3. **Branches** are just nodes with >1 outgoing edge — capture each target as the walk reaches it
+   (drop-row per §3) and draw each arrow when both its endpoints exist.
+
+Failed capture → drop a placeholder in its slot (§5), still draw its arrows, continue (§1 failure).
+
+**Batch fallback (Bash node-driver path only):** without an MCP, interleaving an arrow `eval`
+between captures would kill the driver (§0) — so capture **all** screens in one process, then
+arrange (§3) and draw **all** arrows (§4) after it exits.
