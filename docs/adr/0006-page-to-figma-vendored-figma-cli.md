@@ -2,6 +2,13 @@
 
 **Status:** Accepted (2026-06-20). Supersedes in part [ADR 0001](0001-page-to-figma-depends-on-official-figma-plugin.md).
 
+> **Superseded in part by [ADR 0007](0007-page-to-figma-capture-wireflow.md) (2026-06-21):**
+> page-to-figma no longer reconstructs pages, so the verify loop this ADR optimized for is gone.
+> The vendored figma-cli is **demoted from primary engine to an `eval` helper** (frame-arrange +
+> arrow-create for the wireflow); the native Figma MCP capture (`generate_figma_design`) is now
+> the engine. Points 1–3 and 5 (vendoring mechanics, install) still hold; point 2 (CLI as
+> primary, plugin as fallback) and point 4 (no auto-connect) are revised by ADR 0007 and v1.12.0.
+
 ## Context
 
 page-to-figma's value is a correct-until-green verify loop that *hammers* Figma reads. Driven

@@ -6,6 +6,12 @@
 > page-to-figma now drives the vendored figma-cli as its primary engine; the official Figma
 > plugin documented below is retained as the *fallback* engine, not the sole hard dependency.
 > The body below is preserved as the original record.
+>
+> **Further superseded by ADR 0007 — [0007-page-to-figma-capture-wireflow.md](0007-page-to-figma-capture-wireflow.md) (2026-06-21):**
+> page-to-figma no longer reconstructs or supervises a code→Figma build at all. Its hard
+> dependency is now the Figma MCP **capture** tool (`generate_figma_design`), fail-closed with no
+> fallback build path; `figma-use`/`figma-generate-design` are no longer required. The
+> "accuracy-orchestrator over the official plugin" framing below is historical.
 
 `page-to-figma` is an accuracy orchestrator that supervises the official Figma plugin's
 code→Figma build rather than reimplementing it, so it requires `figma-use`,
