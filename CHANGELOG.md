@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.15.0] - 2026-06-22
+
+### Changed
+- **`page-to-figma` arrows are now magnetic FigJam connectors (cloned donor); `use_figma` is the
+  primary node-op engine.** Documented from a production wireflow run (ADR 0008, supersedes ADR
+  0007's static-VECTOR + figma-cli-engine decisions).
+  - **Magnetic connectors (primary).** `createConnector` throws in a `/design/` file, but a
+    connector **pasted from FigJam survives as a real `CONNECTOR` node** — so the skill clones a
+    one-time human-pasted **donor** and re-points its endpoints per edge (`§4`). Result: arrows that
+    snap to frames, **auto-reroute** when screens move, fan cleanly via inherited `ELBOWED` routing,
+    and carry their label on the line. The donor's style propagates to every clone. This also
+    **eliminates the fragile `strokeCap` arrowhead** failure class on the primary path.
+  - **Static VECTOR arrows demoted to a fallback** (`§4b`) for when the user declines the one-time
+    donor paste. The skill offers the donor setup up front and walks a non-technical user through it
+    (new `§0` prerequisite).
+  - **`use_figma` (Figma MCP Plugin API) is now the primary engine** for container/reparent/arrange/
+    connector ops — the same bridge already required for capture. The vendored **figma-cli `eval`**
+    is a documented **fallback** only (its local CDP bridge can fail outright — e.g. error -600).
+  - **Routing tidy:** size the branch corridor by fan-out (wide fans need a taller drop gap, ~580px
+    for ~6 branches); because connectors are magnetic, de-crowding is just moving frames.
+  - Capture **frame size now tracks the capture viewport** (e.g. 1440×900), not a hardcoded ~1600px,
+    in the confirm-by-new-frame heuristic and the incremental layout precompute.
+
 ## [1.14.1] - 2026-06-22
 
 ### Fixed
@@ -375,6 +398,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.15.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main

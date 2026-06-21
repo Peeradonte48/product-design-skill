@@ -2,6 +2,10 @@
 
 **Status:** Accepted (2026-06-21). Supersedes [ADR 0006](0006-page-to-figma-vendored-figma-cli.md)
 and the engine premise of [ADR 0001](0001-page-to-figma-depends-on-official-figma-plugin.md).
+**Superseded in part by [ADR 0008](0008-page-to-figma-magnetic-connectors.md) (2026-06-22):** the
+"arrows are static `VECTOR`s" mechanism is replaced by magnetic cloned-donor connectors (static
+VECTOR demoted to fallback), and `use_figma` becomes the primary node-op engine (figma-cli demoted
+to fallback). The capture / arrange / flow-source / completion-gate decisions below still stand.
 
 ## Context
 

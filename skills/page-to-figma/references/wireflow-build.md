@@ -1,12 +1,22 @@
 # Wireflow build mechanics (page-to-figma)
 
-Concrete recipes the skill calls. `$FIGMA_CLI` is the vendored CLI
-(`node ~/.claude/figma-cli/src/index.js`, or the project copy).
+Concrete recipes the skill calls. Run node ops via **`use_figma`** (primary engine — see §0);
+the `$FIGMA_CLI eval` form shown in the snippets is the vendored figma-cli
+(`node ~/.claude/figma-cli/src/index.js`, or the project copy) **fallback**.
 
 ## 0. Driver prerequisites & environment (check before any capture)
 
 These are the things a real run will fail on if you skip them. Check §0 first.
 
+- **Node-op engine: prefer `use_figma` (Figma MCP Plugin API).** Every container / reparent /
+  arrange / connector op below is Plugin API JS. Run it via **`use_figma`** — load the `figma-use`
+  skill first; use the **async** API (`getNodeByIdAsync`, `setCurrentPageAsync`, `loadFontAsync`);
+  `use_figma` scripts are **atomic**, so batch ~5–6 ops per call (a throw rolls the whole batch
+  back). This is the **same MCP bridge** already required for `generate_figma_design` / `whoami` /
+  `get_metadata`, so it adds no new dependency. The `$FIGMA_CLI eval` form in these snippets is the
+  **figma-cli fallback** — usable only when its local CDP bridge is up, which **can fail outright**
+  (e.g. `open -a Figma --args --remote-debugging-port=9222` → error -600). **Don't depend on
+  figma-cli.**
 - **Playwright is a hard, fail-closed dependency. Prefer a Playwright MCP.** It runs in the
   user's environment and can open a headed browser for login. **Check for it up front.** If there
   is no Playwright MCP **and** no importable `playwright` / `playwright-core` on a reachable path,
@@ -67,6 +77,20 @@ These are the things a real run will fail on if you skip them. Check §0 first.
   user's *own* app and uploads to Figma's cloud — exactly what `page-to-figma` does), but it is a
   real arbitrary-code capability, so present it as a conscious, scoped grant — don't enable it for
   untrusted work.
+- **Magnetic arrows need a one-time "donor" connector (recommended).** True FigJam-style connectors
+  that snap to screens and auto-reroute can't be *created* in a `/design/` file (`createConnector`
+  throws), but a connector **pasted from FigJam survives** and can be cloned per edge (§4). That
+  needs one human step. Ask the user up front; if they decline, fall back to static VECTOR arrows
+  (§4b). Walk a non-technical user through it:
+
+  > For arrows that snap to your screens and auto-reroute when you move things, I need one "donor"
+  > connector (one-time): open any **FigJam** file → draw one connector/arrow → copy it
+  > (⌘/Ctrl-C) → switch to your **design** file → paste (⌘/Ctrl-V). Style that one the way you want
+  > *all* arrows to look (color, thickness, arrowhead) — every wireflow arrow copies it. Then send
+  > me its link (or say "find it" and I'll locate the `CONNECTOR` node). Prefer plain static arrows?
+  > Say so and I'll skip this.
+
+  **Keep the donor permanently** — every clone depends on it.
 - **One long-lived process per run — *Bash node-driver path only*.** A capture upload continues
   *after* the JS promise resolves (§1 step 4). On the **Bash node-driver path**, many agent
   sandboxes **kill still-running background jobs when a new shell command starts**, cutting off
@@ -119,8 +143,8 @@ The capture is **driven from inside the running page** (not a single MCP call): 
    (§0).
 5. **Confirm by new frames (not by status).** `pending` is **ambiguous**: a never-submitted capture
    and a still-uploading one both report `pending`, so status polling alone can't tell a cut-off
-   upload from a slow one. The reliable signal is a **new ~1600px frame** appearing — enumerate the
-   container's (and the file's) frames
+   upload from a slow one. The reliable signal is a **new frame at the capture viewport size**
+   (whatever you set — e.g. 1440×900) appearing — enumerate the container's (and the file's) frames
    (`$FIGMA_CLI eval 'figma.getNodeById("<containerId>").children.map(c=>({id:c.id,name:c.name,w:c.width}))'`
    or `get_metadata`) and match each expected screen to a newly-added frame; rename matched frames.
    **MCP path:** confirm each screen **immediately** (the browser isn't a shell job, so an `eval`
@@ -207,11 +231,14 @@ $FIGMA_CLI eval '(function(){
 **Reparent is the primary strategy — passing the container `nodeId` to `generate_figma_design` is
 unreliable.** Captures frequently still land **loose on an unrelated page** even when the `nodeId`
 is supplied. So: still pass the `nodeId` (it helps when it works), but **expect to reparent**.
-After each capture lands (§1 step 5), locate the new frame by scanning for recently-added ~1600px
-frames **wherever they landed** (not only inside the container), then move it onto the container —
+After each capture lands (§1 step 5), locate the new frame by scanning for recently-added
+viewport-size frames **wherever they landed** (not only inside the container), then move it onto
+the container — via `use_figma` (primary, async) or `$FIGMA_CLI eval` (fallback):
 
-```bash
-$FIGMA_CLI eval 'figma.getNodeById("<containerId>").appendChild(figma.getNodeById("<frameId>"))'
+```js
+// use_figma (primary):
+(await figma.getNodeByIdAsync("<containerId>")).appendChild(await figma.getNodeByIdAsync("<frameId>"))
+// $FIGMA_CLI eval (fallback): figma.getNodeById("<containerId>").appendChild(figma.getNodeById("<frameId>"))
 ```
 
 ## 3. Arrange — lanes + branch drop-rows
@@ -222,13 +249,75 @@ Place full-size captured frames; do not scale. Constants: `GUTTER_X = 240`, `GUT
   `x = rowOriginX + Σ(prev widths + GUTTER_X)`, `y = rowY`.
 - A **branch** (a node with >1 outgoing edge): the primary next stays on the row; each
   additional target drops to a sub-row at `y = rowY + maxRowHeight + GUTTER_Y` and continues.
-- Set each frame's `x`/`y` in one `eval` batch:
-  `frames.forEach(f => { const n = figma.getNodeById(f.id); n.x = f.x; n.y = f.y; })`.
+- Set each frame's `x`/`y` in one batch (via `use_figma` async, or `$FIGMA_CLI eval` fallback):
+  `frames.forEach(f => { const n = figma.getNodeById(f.id); n.x = f.x; n.y = f.y; })`
+  (`use_figma`: `for (const f of frames) { (await figma.getNodeByIdAsync(f.id)) ... }`).
+- **Size the corridor by fan-out.** Connector labels auto-center on the line, so de-crowd with
+  *frame spacing*, not label moves: a wide fan (e.g. 6 branches off one screen) crowds at the
+  default `GUTTER_Y`; widen that row's drop gap (~580px for ~6 branches) so the connectors and their
+  labels spread along the bus. Because magnetic connectors (§4) auto-reroute, **just move the
+  frames** (`frame.y` + resize the board) — no arrow edits needed.
 
-## 4. Draw a labeled arrow (orthogonal, static)
+## 4. Connect screens with a magnetic connector (clone the donor) — primary
 
-Native connectors are FigJam-only; draw an axis-aligned VECTOR with an arrow cap (no rotation
-math) from source right-mid to target left-mid, plus an Inter label at the elbow:
+`createConnector()` **throws** in a `/design/` file (connectors are FigJam-only). **But** a
+connector **copy-pasted from FigJam into the design file survives as a real `CONNECTOR` node**, and
+the Plugin API can read/write its `connectorStart` / `connectorEnd` / `magnet`. So a single pasted
+**donor** (§0) is **cloned and re-pointed** for every edge — giving true magnetic, `ELBOWED`,
+auto-rerouting arrows whose label rides on the line and whose style is inherited from the donor.
+If no donor exists, use the VECTOR fallback (§4b).
+
+Per edge `A → B`, via **`use_figma`** (load `figma-use` first; **batch ~5–6 edges per call** —
+scripts are atomic, a throw rolls the whole batch back):
+
+```js
+const src   = await figma.getNodeByIdAsync(DONOR_ID);   // the pasted FigJam connector (§0)
+const board = await figma.getNodeByIdAsync(BOARD_ID);
+let pg = board; while (pg && pg.type !== "PAGE") pg = pg.parent;
+await figma.setCurrentPageAsync(pg);                    // endpoints must live on this page
+
+const c = src.clone();
+board.appendChild(c);                                   // ⚠ appendChild BEFORE setting endpoints
+c.connectorStart = { endpointNodeId: FRAME_A, magnet: START_MAGNET };
+c.connectorEnd   = { endpointNodeId: FRAME_B, magnet: END_MAGNET };
+c.name = "C · " + label;
+
+await figma.loadFontAsync({ family: "Inter", style: "Regular" });   // before writing text
+c.text.fontName   = { family: "Inter", style: "Regular" };
+c.text.fontSize   = 16;
+c.text.characters = label;                              // label rides ON the connector
+```
+
+**Magnets** (`"AUTO" | "TOP" | "BOTTOM" | "LEFT" | "RIGHT"`), chosen per edge direction:
+
+| Edge kind | start | end |
+|---|---|---|
+| horizontal spine (left→right) | `RIGHT` | `LEFT` |
+| vertical drop (branch to row below) | `BOTTOM` | `TOP` |
+| let Figma decide | `AUTO` | `AUTO` |
+
+`connectorLineType` is inherited `ELBOWED` — it auto-routes orthogonally and fans multiple
+connectors leaving the same magnet edge. A placeholder ("⚠ Capture failed") frame is a valid
+endpoint too.
+
+**Hard rules / gotchas:**
+- **`appendChild` BEFORE setting endpoints** — endpoint nodes must share the connector's page; the
+  clone lands on the donor's page, so move it onto the board first.
+- `clone()` **preserves the `CONNECTOR` type**; `createConnector` stays unavailable — never call it.
+- **Keep the donor** — every clone depends on it; don't delete it.
+- `loadFontAsync` before `c.text.characters`.
+- Batch ~5–6 connectors per `use_figma` call (atomic rollback on any throw).
+
+**Connector read-back check:** assert `clone.type === "CONNECTOR"` and that
+`connectorStart.endpointNodeId` / `connectorEnd.endpointNodeId` equal the intended `FRAME_A` /
+`FRAME_B`. **No arrowhead/strokeCap check is needed** — the head is the donor's, inherited; the
+VECTOR `strokeCap` fragility (§4b) does not exist on this path.
+
+## 4b. VECTOR fallback (no donor connector available)
+
+When the user declines the donor step, draw a static axis-aligned VECTOR with an arrow cap (no
+rotation math) from source right-mid to target left-mid, plus an Inter label at the elbow. These are
+**static** — they do not attach to frames or re-route when a screen moves.
 
 ```bash
 $FIGMA_CLI eval '(async function(){
@@ -263,13 +352,13 @@ $FIGMA_CLI eval '(async function(){
 
 A placeholder target ("⚠ Capture failed") is still a valid `DST_ID` — arrows draw to it too.
 
-**Arrow read-back check:** assert the returned `p0 ≈ source right-mid` and `p1 ≈ target
+**VECTOR read-back check:** assert the returned `p0 ≈ source right-mid` and `p1 ≈ target
 left-mid` (±2px). If off, the source/target ids or rects were wrong — fix before continuing.
 Additionally, **confirm that an arrowhead actually rendered**: read the end vertex's `strokeCap`
 (via `v.vectorNetwork`) and assert it is not `"NONE"`. Endpoints matching does not prove the
 head drew — a headless line that passes the ±2px endpoint check is a **silent failure**. If the
 cap is `NONE`, apply the per-vertex `setVectorNetworkAsync` fallback described in the code
-comment above before continuing.
+comment above before continuing. (The magnetic connector path, §4, avoids all of this.)
 
 ## 5. Placeholder frame for a failed capture
 
@@ -320,21 +409,23 @@ connect it, then move on. It's more robust (a mid-run failure leaves a *connecte
 not a pile of loose captures) and lets you verify each link as you go.
 
 1. **Confirm the flow graph first** (Flow sources / §7) and **precompute each node's lane slot**
-   from the graph (§3) — expected `x`/`y` using the full capture width (~1600px; refine once real
-   widths land). You know the whole graph up front, so the layout is deterministic.
+   from the graph (§3) — expected `x`/`y` using the capture viewport width (e.g. 1440; refine once
+   real widths land). You know the whole graph up front, so the layout is deterministic.
 2. **Walk the flow in order.** For each node the walk reaches:
    a. **Capture it** (§1) — reach the state, inject + fire, **hold until the upload lands**, then
       confirm the new frame **immediately** (MCP browser isn't a shell job, so an `eval` won't kill
       it — §1 step 5).
    b. **Reparent + place** it: `appendChild` onto the container (§2) and set its `x`/`y` to its
       precomputed slot (§3).
-   c. **Draw every edge whose *both* endpoints are now placed** (§4) with the edge label, and
-      read-back-check each. Usually that's the arrow from the just-captured node's predecessor, but
-      doing it by "both endpoints placed" also closes **merges** and **back-edges** correctly.
+   c. **Connect every edge whose *both* endpoints are now placed** — clone + re-point a connector
+      (§4; VECTOR if no donor, §4b) with the edge label, and read-back-check each. Usually that's
+      the edge from the just-captured node's predecessor, but doing it by "both endpoints placed"
+      also closes **merges** and **back-edges** correctly. (Magnetic connectors auto-reroute, so
+      later frame moves won't break earlier edges.)
 3. **Branches** are just nodes with >1 outgoing edge — capture each target as the walk reaches it
-   (drop-row per §3) and draw each arrow when both its endpoints exist.
+   (drop-row per §3, widen the corridor by fan-out) and connect each edge when both endpoints exist.
 
-Failed capture → drop a placeholder in its slot (§5), still draw its arrows, continue (§1 failure).
+Failed capture → drop a placeholder in its slot (§5), still connect its edges, continue (§1 failure).
 
 **Batch fallback (Bash node-driver path only):** without an MCP, interleaving an arrow `eval`
 between captures would kill the driver (§0) — so capture **all** screens in one process, then
