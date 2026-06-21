@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.11.1] - 2026-06-21
+
+### Fixed
+- **`/update-design-skills` no longer fails with "the piped run hit error."** The command's
+  embedded `! curl … | bash -s -- --update` is a pipeline, and Claude Code evaluates **every**
+  segment of a piped bang command against `allowed-tools` independently. The frontmatter only
+  listed `Bash(curl:*)`, so the `bash -s -- --update` segment was unauthorized; because bang
+  commands run non-interactively (no tty), the unmet permission surfaced as an error instead of a
+  prompt, and the update never ran. Added `Bash(bash:*)` to `allowed-tools` so the whole pipeline
+  is authorized. `install.sh` itself was unchanged — it exits 0 in install/update/re-update runs.
+
 ## [1.11.0] - 2026-06-21
 
 ### Added
@@ -219,7 +230,8 @@ and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...main
+[1.11.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.0...main
+[1.11.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.7.0...v1.8.0

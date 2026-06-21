@@ -1,6 +1,6 @@
 ---
 description: Update the product-design-skill suite to the latest version
-allowed-tools: Bash(curl:*)
+allowed-tools: Bash(curl:*), Bash(bash:*)
 ---
 
 Run the product-design-skill updater below. It fetches the latest `install.sh`
