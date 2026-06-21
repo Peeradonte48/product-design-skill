@@ -5,6 +5,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.14.1] - 2026-06-22
+
+### Fixed
+- **`page-to-figma` — eliminate the silent capture hang.** A live run reported the capture step
+  running for minutes with **no output and no error**. Root cause class: unbounded in-page waits.
+  The 1.13.x "hold the page open until the upload is confirmed" guidance could be implemented as an
+  **`await` of `captureForDesign` (or an in-page sleep/poll) inside `browser_run_code_unsafe`** —
+  but that promise resolves *before* the cloud upload finishes and in some environments never
+  settles, so the tool call blocks forever with nothing to show. Fixes:
+  - **Don't `await` the capture in the page** (`§1` step 3): fire it and return immediately; confirm
+    completion out-of-band by polling for the frame. On the MCP path the browser stays open on its
+    own — no in-page "hold" at all (`§1` step 4). The bounded `waitForTimeout` guard is now scoped to
+    the Bash node-driver path only.
+  - **Never wait silently** (`§0`): every navigation / capture / poll gets a max budget and emits a
+    heartbeat; a multi-minute step with no output is treated as a bug, not slowness. Explicit
+    timeouts on `browser_navigate` / `browser_run_code_unsafe`; never wait on `networkidle`.
+  - **New `§9` "If a capture hangs — localize, don't wait"** — a cheap, bounded probe ladder
+    (browser-alive → navigation → console for CSP/CORS → fire-without-await → frame-landed) so the
+    agent reports *where* it's stuck instead of sitting in the wait.
+
 ## [1.14.0] - 2026-06-22
 
 ### Changed
@@ -355,6 +375,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
