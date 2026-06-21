@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.13.3] - 2026-06-22
+
+### Fixed
+- **`page-to-figma` — corrected the permission-grant guidance against the official docs.** The
+  1.13.2 walkthrough implied a session restart and overstated the block. Verified against Claude
+  Code's permission docs and corrected `§0`:
+  - **`permissions` hot-reload — no restart needed.** Adding the allow rule takes effect
+    immediately; dropped the "restart the session" step.
+  - **`acceptEdits`/auto modes don't help** and the script no longer implies they might: `.claude/`
+    is a **protected path** (an agent edit to `settings.local.json` still prompts the user, and
+    stricter setups deny the self-grant outright), and `acceptEdits` only auto-approves file edits +
+    a few filesystem Bash commands — **never an MCP tool call**.
+  - **Added the easiest path for non-experts:** approve the permission prompt with **"Yes, and
+    don't ask again"** when it appears — no file editing at all.
+  - **Added the shortcuts:** `mcp__playwright__*` wildcard (all Playwright tools) and the user-level
+    `~/.claude/settings.json` location as alternatives to the per-project file.
+
 ## [1.13.2] - 2026-06-22
 
 ### Fixed
@@ -322,6 +339,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.13.3]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main

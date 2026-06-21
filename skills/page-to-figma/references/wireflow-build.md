@@ -16,40 +16,49 @@ These are the things a real run will fail on if you skip them. Check §0 first.
   MCP exists to avoid. With the MCP present, the whole drive-then-capture flow is trivial.
 - **Pre-authorize the in-page code-execution tool — the most common hard block.** Capture *must*
   run Figma's `capture.js` inside the live page (§1 step 3), so it needs a tool that executes
-  arbitrary JS in the page, and those are **denied by default**. The agent **cannot self-grant**
-  it (a classifier blocks even the attempt to add the permission) — only the user can. So confirm
-  it's allowed **before** capturing; being blocked partway in wastes the whole run.
+  arbitrary JS in the page (e.g. the Playwright MCP's `browser_run_code_unsafe`), and those are
+  **denied by default**. **Only the user can grant it.** `acceptEdits`/auto modes do **not** help:
+  `.claude/` is a **protected path** (an agent edit to `.claude/settings.local.json` still prompts
+  the user, and stricter setups deny the self-grant outright), and `acceptEdits` only auto-approves
+  file edits + a few filesystem Bash commands — **never an MCP tool call**. Good news: once added,
+  **`permissions` hot-reload immediately — no session restart needed.** Confirm it's allowed
+  **before** capturing; being blocked partway wastes the whole run.
 
   **Walk the user through the grant — assume they are not technical.** Don't just print a tool
-  name. When the tool is blocked (or up front, in step 1 of the pipeline), tell the user, in plain
+  name. When the tool is blocked (or up front, in pipeline step 1), tell the user, in plain
   language, something like this and **wait** for them to confirm before retrying:
 
   > To copy your page into Figma I need a one-time permission: to run Figma's capture script inside
   > your app's browser tab. Your setup blocks that by default and I'm not allowed to turn it on
-  > myself — you have to. It takes ~20 seconds:
+  > myself — you have to. Pick either way:
   >
-  > 1. In **this project's** folder, open the file `.claude/settings.local.json`.
-  >    (If it doesn't exist, create it with the full contents shown below.)
+  > **Easiest — approve when asked:** if a permission prompt appears when I try, choose
+  > **"Yes, and don't ask again."** Done.
+  >
+  > **Or add it once in settings (~20 seconds):**
+  > 1. In **this project's** folder, open `.claude/settings.local.json` (create it if it's missing).
   > 2. Add `"mcp__playwright__browser_run_code_unsafe"` to the `permissions.allow` list.
-  > 3. Save the file. If I still can't proceed right after, restart this session so it loads.
-  > 4. Tell me "continue".
+  > 3. Save — it takes effect right away, **no restart**. Then tell me "continue".
   >
   > File doesn't exist yet — paste this whole thing in:
   > ```json
   > { "permissions": { "allow": ["mcp__playwright__browser_run_code_unsafe"] } }
   > ```
-  > File already exists — just add the line inside the existing `allow` array:
+  > File already exists — add the line inside the existing `allow` array:
   > ```json
   > { "permissions": { "allow": [ "...your existing entries...",
   >   "mcp__playwright__browser_run_code_unsafe" ] } }
   > ```
+  > (Want it for all Playwright tools, or everywhere? Use `"mcp__playwright__*"`, or put the same
+  > line in your user-level `~/.claude/settings.json`.)
+  >
   > This only lets me run Figma's own capture script in your own app to send it to your own Figma —
-  > exactly what this command does. It's safe to leave on for this; you can remove the line later.
+  > exactly what this command does. Safe to leave on for this; remove it later if you like.
 
-  - **The user must make the change — don't assume you can.** A live run showed the guard also
-    blocks the agent from *adding the permission rule itself*, so don't promise to "just do it" and
-    then dead-end. You may *offer* to edit the file if they ask, but if that edit is blocked, fall
-    back to walking them through the manual steps above. The human grants; you guide.
+  - **You may offer to make the edit, but expect a prompt either way.** `.claude/` is protected, so
+    even if you edit `settings.local.json` yourself the user must still approve the write (and some
+    setups deny the agent self-grant outright). The human always consents — so default to guiding
+    them, and only edit-for-them if they ask.
   - **Bash node-driver path (§1b):** needs Bash + an importable `playwright`/`playwright-core`; it
     runs the same in-page JS via `page.addScriptTag` + `page.evaluate`, so it may hit its own
     guard. Not a way to dodge the permission — just a different gate.
