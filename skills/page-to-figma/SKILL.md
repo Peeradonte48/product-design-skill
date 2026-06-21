@@ -85,13 +85,15 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
    (fonts, non-Latin scripts, CSS framework) on this one screen **before scaling**. Never invent
    states.
 6. **Build incrementally — capture → place → connect, one screen at a time** (default, Playwright
-   MCP path). Walk the flow in order; for each screen: capture it (hold until it lands, confirm the
-   frame), place it in its lane slot (**lanes + branch drop-rows**, full size — §3), then **draw the
-   labeled arrow from its predecessor** (orthogonal VECTOR + arrow `strokeCap` + Inter label — §4)
-   and read-back-check it. Repeat. This leaves a *connected* partial flow if a run dies and lets you
-   verify each link as you go. The MCP browser persists across shell commands, so interleaving
-   captures and arrow `eval`s is fine (`references/wireflow-build.md` §8). Rename each frame to its
-   screen name. Arrows are **static** (they don't reroute if frames move).
+   MCP path). Walk the flow in order; for each screen: capture it (**fire the in-page capture, don't
+   `await` it** — then poll for the frame to confirm it landed), place it in its lane slot (**lanes +
+   branch drop-rows**, full size — §3), then **draw the labeled arrow from its predecessor**
+   (orthogonal VECTOR + arrow `strokeCap` + Inter label — §4) and read-back-check it. Repeat. This
+   leaves a *connected* partial flow if a run dies and lets you verify each link as you go. The MCP
+   browser persists across shell commands, so interleaving captures and arrow `eval`s is fine
+   (`references/wireflow-build.md` §8). Rename each frame to its screen name. Arrows are **static**.
+   **Bound every wait and emit progress** — a capture running long with **no output is a hang, not
+   slowness**; localize it (`references/wireflow-build.md` §9), never sit silently.
 7. **Batch fallback (no Playwright MCP).** With only the Bash node-driver, a stray shell command
    kills the capture driver (§0), so you can't interleave — capture all screens in one process,
    then arrange (§3) and draw all arrows (§4) after it exits (`references/wireflow-build.md` §8).

@@ -75,6 +75,12 @@ These are the things a real run will fail on if you skip them. Check §0 first.
   **On the Playwright MCP path this does not apply:** the browser session lives in the MCP server
   and survives shell commands, so you capture **one screen at a time** and interleave arrow `eval`s
   — the incremental default (§8).
+- **Never wait silently — bound every wait and emit a heartbeat.** Navigation, capture, "hold", and
+  poll each get a **max time budget** and print progress as they go (`fired 02…`, `poll 3/10…`). A
+  step that runs for minutes with **no output is a bug, not slowness** — stop and localize (§9), do
+  not sit in the wait. Set explicit timeouts on `browser_navigate` / `browser_run_code_unsafe`;
+  never rely on an unbounded default, and **never `await` a promise that's known to resolve early or
+  may never settle** (§1 step 3) — that is the #1 silent-hang cause.
 - **Headless in a sandbox.** A headed Chromium hangs where there is no display. Use
   `headless: true` for the capture driver; reserve headed mode for interactive login via the MCP
   or the user's own browser (§6).
@@ -95,15 +101,22 @@ The capture is **driven from inside the running page** (not a single MCP call): 
 2. **Reach the exact state (Playwright).** Navigate (`domcontentloaded` + `waitForSelector`, §0)
    and drive any interaction (open the modal, switch tab, submit) so the live page shows the state.
    Apps **without deep-linkable routes must** drive state this way — see §1b.
-3. **Inject + fire.** Inject `capture.js` into the page, then call
-   `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })` (or a tighter
-   selector for a sub-region).
-4. **Hold the page open until the upload is confirmed received.** ⚠️ **CRITICAL.**
-   `captureForDesign` resolves **before** the screenshot finishes uploading to Figma's cloud.
-   **Closing the page/context now silently drops the capture** — it sits at `pending` forever and
-   no frame ever lands. Do **not** close on promise-resolve. Either `await` a true completion
-   signal if the capture API exposes one, or hold each screen open with a generous in-process wait
-   (seconds, not ~0.5s) before moving on. Only `browser.close()` after **every** screen is done.
+3. **Inject + fire — do NOT `await` it to completion in the page.** Inject `capture.js`, then call
+   `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`. **Fire it; return
+   from the in-page call right away.** Its promise resolves *before* the cloud upload finishes (and
+   in some environments the long tail never settles), so **awaiting it inside
+   `browser_run_code_unsafe` / `page.evaluate` is exactly how a run hangs silently with no output.**
+   Give the in-page call a short evaluate timeout (e.g. 10–15s); treat real completion as
+   out-of-band (step 5), not as "the promise returned." If it hangs here, localize per §9.
+4. **Keep the page open until the upload lands — without *blocking* on it.**
+   - **MCP path:** the browser stays open between tool calls on its own — do **nothing** to "hold"
+     it (no in-page sleep, no in-page poll loop). Just don't close it; confirm via step 5.
+   - **Bash node-driver path:** the process owns the browser, so keep it alive past the fire with a
+     **bounded** guard (`waitForTimeout(10000)`), then `browser.close()` after **all** screens.
+     Confirm after exit (step 5).
+   ⚠️ Closing too early silently drops the capture (`pending` forever); holding/awaiting with **no
+   timeout** is the mirror-image failure (**silent hang**). Bound every wait and emit a heartbeat
+   (§0).
 5. **Confirm by new frames (not by status).** `pending` is **ambiguous**: a never-submitted capture
    and a still-uploading one both report `pending`, so status polling alone can't tell a cut-off
    upload from a slow one. The reliable signal is a **new ~1600px frame** appearing — enumerate the
@@ -326,3 +339,29 @@ Failed capture → drop a placeholder in its slot (§5), still draw its arrows, 
 **Batch fallback (Bash node-driver path only):** without an MCP, interleaving an arrow `eval`
 between captures would kill the driver (§0) — so capture **all** screens in one process, then
 arrange (§3) and draw **all** arrows (§4) after it exits.
+
+## 9. If a capture hangs — localize, don't wait
+
+A capture that runs minutes "with no output" is a **silent hang**, not slow progress. Stop and find
+*where* it's stuck before retrying — the fix differs completely by location. Run this cheap, bounded
+ladder (MCP path) and act on the first step that stalls:
+
+1. **Browser alive?** `browser_run_code_unsafe` returning `1+1`. Hangs → the MCP browser is wedged
+   (e.g. launched **headed with no display** §0, or never started) → restart it. Works → not the
+   browser; continue.
+2. **Navigation?** `browser_navigate` to the URL (force **`domcontentloaded`, never `networkidle`**
+   — Vite HMR never idles, §0), then `browser_take_screenshot`. Hangs → the wait-state or dev
+   server; switch to `domcontentloaded` + a `waitForSelector` on the app root.
+3. **Console clean?** `browser_console_messages` right after injecting `capture.js`. **The
+   high-value check** — a **CSP** violation, a **CORS**-blocked upload to `endpoint`, or a font /
+   resource error here means `capture.js` can't run or its upload is blocked, so the promise never
+   settles. Fix the CSP/CORS/origin rather than waiting.
+4. **Fire WITHOUT await.** Call `captureForDesign(...)` fire-and-forget (don't await the in-page
+   promise) and return a marker immediately (§1 step 3). Returns instantly → the hang was the
+   `await`; switch to fire-then-poll. Still hangs even fire-and-forget → the in-page call itself is
+   blocked (back to step 3).
+5. **Frame landed?** Poll `generate_figma_design(fileKey, captureId)` and enumerate container frames
+   (§1 step 5), **bounded + with progress**. Appears → success, stop. Never appears → upload blocked
+   (step 3) or wrong `endpoint` / `captureId`.
+
+Whatever you find, **report it** — a silent multi-minute wait is never an acceptable end state.
