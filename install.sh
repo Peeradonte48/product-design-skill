@@ -381,7 +381,7 @@ fi
 
 # --- vendored figma-cli (Node CLI → sibling figma-cli/ dir) -----------------
 # Shipped as committed source; deps installed here. Best-effort and non-fatal:
-# a box without Node still gets the skills, and page-to-figma uses the MCP fallback.
+# a box without Node still gets the skills, but page-to-figma needs figma-cli's eval to arrange frames + draw wireflow arrows (capture itself always runs via the Figma MCP).
 if [ -d "$CLI_SRC" ]; then
   cli_changed=0
   if [ -d "$CLI_TARGET" ]; then
@@ -403,10 +403,10 @@ if [ -d "$CLI_SRC" ]; then
       if ( cd "$CLI_TARGET" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1 ); then
         say "figma-cli: dependencies installed"
       else
-        say "figma-cli: npm install failed — page-to-figma will use the Figma MCP fallback"
+        say "figma-cli: npm install failed — page-to-figma can still capture via the Figma MCP, but needs figma-cli for wireflow arrange/arrows"
       fi
     else
-      say "figma-cli: Node/npm not found — skipped deps; page-to-figma will use the Figma MCP fallback"
+      say "figma-cli: Node/npm not found — skipped deps; capture works via the Figma MCP, but wireflow arrange/arrows need figma-cli"
     fi
   fi
 fi

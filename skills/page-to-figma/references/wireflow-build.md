@@ -68,6 +68,11 @@ $FIGMA_CLI eval '(async function(){
     data: "M " + ax + " " + ay + " L " + mx + " " + ay + " L " + mx + " " + by + " L " + bx + " " + by }];
   v.strokes = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
   v.strokeWeight = 2; v.strokeCap = "ARROW_LINES";
+  // NOTE: if the arrowhead does not render, the node-level strokeCap alone may be
+  // insufficient when geometry came from vectorPaths (assigning vectorPaths regenerates
+  // the underlying vectorNetwork whose per-vertex strokeCap defaults to NONE).
+  // Fallback to try during the live run: read v.vectorNetwork, set the LAST vertex's
+  // strokeCap = "ARROW_LINES", then reassign via await v.setVectorNetworkAsync(network).
   let labelId = null;
   const LABEL = "LABEL_TEXT";
   if (LABEL) {
@@ -86,6 +91,11 @@ A placeholder target ("⚠ Capture failed") is still a valid `DST_ID` — arrows
 
 **Arrow read-back check:** assert the returned `p0 ≈ source right-mid` and `p1 ≈ target
 left-mid` (±2px). If off, the source/target ids or rects were wrong — fix before continuing.
+Additionally, **confirm that an arrowhead actually rendered**: read the end vertex's `strokeCap`
+(via `v.vectorNetwork`) and assert it is not `"NONE"`. Endpoints matching does not prove the
+head drew — a headless line that passes the ±2px endpoint check is a **silent failure**. If the
+cap is `NONE`, apply the per-vertex `setVectorNetworkAsync` fallback described in the code
+comment above before continuing.
 
 ## 5. Placeholder frame for a failed capture
 
