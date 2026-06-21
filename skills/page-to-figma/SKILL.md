@@ -37,6 +37,11 @@ related questions, but don't proceed past an unresolved ambiguity.
   Playwright MCP **and** no importable `playwright`/`playwright-core`, this is **fail-closed** —
   stop and tell the user to install it (`claude mcp add playwright npx @playwright/mcp@latest`,
   then restart). Don't hand-locate a cached Chromium binary.
+- **In-page code execution: a denied-by-default permission.** Capture injects Figma's `capture.js`
+  into the live page, which needs an arbitrary-JS-in-page tool (e.g. the MCP's
+  `browser_run_code_unsafe`). It's **blocked by default and the agent can't self-grant it** — the
+  user must allow it in the target project's `.claude/settings.local.json` **before** capturing
+  (`references/wireflow-build.md` §0).
 - **Arrange + arrows: vendored figma-cli `eval`** — `FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"`
   (project install) else `node ${HOME}/.claude/figma-cli/src/index.js`. Its `connect` is
   auto-run on a down daemon (announce first; see v1.12.0 behavior). The CLI is an `eval` helper
@@ -56,7 +61,12 @@ placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow
 
 1. **Verify engines first (fail-closed).** Confirm both the **Figma capture** and **Playwright**
    (prefer the MCP) are reachable before doing anything (`references/wireflow-build.md` §0). If
-   Playwright is missing, stop and have the user install `@playwright/mcp`. Don't improvise.
+   Playwright is missing, stop and have the user install `@playwright/mcp`. Don't improvise. **Also
+   confirm the in-page code-execution tool is *allowed*** (e.g. `browser_run_code_unsafe`) — it's
+   denied by default and the agent can't self-grant it. If it's blocked, **walk the user through
+   the grant in plain language, step by step (assume they're not technical), and wait** — don't
+   just print a tool name. Use the ready-to-relay script in `references/wireflow-build.md` §0. Do
+   this now, not 4 screens in.
 2. **Resolve the target design file.** Use the user's existing `/design/` file, else
    `create_new_file` (editorType `design`; load the `figma-create-new-file` skill first; resolve
    the plan via `whoami`). Create one **Wireflow page + container** (`references/wireflow-build.md` §2).

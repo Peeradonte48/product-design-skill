@@ -5,6 +5,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.13.2] - 2026-06-22
+
+### Fixed
+- **`page-to-figma` — front-load the in-page code-execution permission (second live-run blocker).**
+  The second live run got further (one screen captured + **serializer fidelity confirmed for Thai
+  fonts + Tailwind v4**) but then hard-blocked: capture must inject Figma's `capture.js` and run it
+  in the live page, which needs an arbitrary-JS-in-page tool (e.g. the Playwright MCP's
+  `browser_run_code_unsafe`). That tool is **denied by default and the agent cannot self-grant it**
+  (a classifier blocks even the self-grant attempt). The skill now documents this as a first-class,
+  checked prerequisite (`§0`, plus `SKILL.md` engines + pipeline step 1): the user must allow the
+  tool in the **target project's** `.claude/settings.local.json` `permissions.allow` array *before*
+  capturing — not partway through a run. Notes the Bash node-driver path (`§1b`) runs the same
+  in-page JS and is gated too (not a dodge), and frames the grant as a conscious, scoped trust
+  decision (Figma's first-party capture script, the user's own app, Figma's own cloud).
+- **`page-to-figma` — guide non-technical users through the permission grant.** `§0` now ships a
+  ready-to-relay, plain-language script the agent reads to the user when the tool is blocked:
+  why it's needed, which file to open (with the create-it-if-missing case), the exact JSON to add,
+  save-and-restart, then "continue." The skill instructs the agent to **walk the user through it
+  and wait**, not just print a tool name — and is honest that the agent itself can't add the rule
+  (a live run showed the guard blocks the self-grant), so the human grants and the agent guides.
+
 ## [1.13.1] - 2026-06-22
 
 ### Fixed
@@ -301,6 +322,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.13.2]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.13.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...main
 [1.12.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.11.1...v1.12.0
