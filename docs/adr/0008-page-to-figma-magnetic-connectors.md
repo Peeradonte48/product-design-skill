@@ -58,3 +58,27 @@ changed the calculus:
 - The vendored figma-cli is retained (ADR 0006) but demoted from primary engine to fallback; ADR
   0007's static-VECTOR arrow decision is superseded. No change to capture, flow sources, the
   incremental build, auth, or the completion gate.
+
+## Addendum (2026-06-22, v1.16.0) — magnetic is the primary *attempt*, gated by verify-and-fallback
+
+A second production run (connecting an existing in-Figma section into a wireflow) exposed a hard
+limit of Decision 1 + 3 together: **in some `/design/` files via the `use_figma` plugin bridge,
+re-pointing `connectorStart` is inert.** `connectorEnd` re-binds live (snaps on assign, tracks node
+moves), but the **start vertex stays frozen** at the donor's original location no matter what is
+assigned — node-magnet, free-position, position-offset, atomic `node.set`, clear-then-rebind,
+`connectorLineType` toggle, on a clone *or* the original donor, page-level *or* section-nested, and
+it ignores a real frame nudge. Critically the **property read-back lies** (`connectorStart.endpointNodeId`
+reads correct while the geometry is frozen), and CONNECTOR nodes expose **no `vectorNetwork`**, so
+there is no API to relocate the start by hand. The native connector solver *does* run under the
+figma-cli/CDP engine (which drives the real app), so a CDP path could lift this — but that engine is
+the flaky fallback (error -600), so it was not adopted.
+
+**Refinement (does not reverse this ADR):** magnetic stays the **primary attempt**, but the skill
+now runs a **mandatory verify-and-fallback gate** (`wireflow-build.md` §4): smoke-test ONE edge,
+confirm the start landed **by geometry** (the endpoint-id read-back is insufficient), and if it's
+frozen, **auto-fall-back to static VECTOR (§4b) for all edges**. The completion gate rejects a
+frozen-start connector. This keeps magnetic primary where the environment supports it (e.g. the
+original FIP run) while never shipping broken arrows where it doesn't. The v1.15.0 claim that the
+donor-clone mechanism is unconditionally reliable is corrected to "reliable where `connectorStart`
+re-renders; verify per edge-1 and fall back otherwise." See also the connect-only fast path
+(`§0b`), added the same version, which skips capture entirely when frames already exist in Figma.

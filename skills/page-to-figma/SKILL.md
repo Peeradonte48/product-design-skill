@@ -7,8 +7,11 @@ description: >-
   or running app and wants it mirrored in Figma — one screen, or a whole flow of connected
   screens. Triggers: "capture our app's screens into Figma", "put this page into Figma",
   "turn our live signup flow into a Figma wireflow", "mirror these running pages in Figma
-  and connect them." Do NOT use it to push a finished Figma design INTO code (that's
-  implement-figma-design), or to design something brand-new in Figma with no source page.
+  and connect them." ALSO use it to connect frames that ALREADY EXIST in Figma into a wireflow
+  (a connect-only fast path that skips capture) — triggers: "connect these Figma frames/this
+  section as a wireflow", "draw the flow arrows between these screens". Do NOT use it to push a
+  finished Figma design INTO code (that's implement-figma-design), or to design something
+  brand-new in Figma with no source page.
 ---
 
 # page-to-figma — running page → Figma wireflow
@@ -48,21 +51,37 @@ related questions, but don't proceed past an unresolved ambiguity.
   (`FIGMA_CLI="node ${PWD}/.claude/figma-cli/src/index.js"` else `${HOME}/...`) is a **fallback**
   only — its local CDP bridge can fail outright (error -600); don't depend on it
   (`references/wireflow-build.md` §0).
-- **Arrows: magnetic FigJam connectors (primary), static VECTOR (fallback).** Connectors can't be
-  *created* in a `/design/` file, but a connector **pasted from FigJam survives** and is cloned +
-  re-pointed per edge → real snapping, auto-rerouting arrows (`references/wireflow-build.md` §4).
-  This needs a one-time human **donor** paste; if the user declines, fall back to static VECTOR
-  arrows (§4b). The donor's style propagates to every clone.
+- **Arrows: magnetic FigJam connectors (primary attempt), static VECTOR (fallback).** Connectors
+  can't be *created* in a `/design/` file, but a connector **pasted from FigJam survives** and is
+  cloned + re-pointed per edge → real snapping, auto-rerouting arrows (`references/wireflow-build.md`
+  §4). This needs a one-time human **donor** paste; if the user declines, use static VECTOR (§4b).
+  **Magnetic is the primary *attempt*, not a guarantee:** in some `/design/` files via `use_figma`,
+  re-pointing `connectorStart` is **inert** (the start vertex freezes at the donor's old spot while
+  the property read-back falsely reads correct). So §4 carries a **mandatory verify-and-fallback
+  gate** — smoke-test ONE edge, confirm by *geometry* that the start landed (not by endpoint-id),
+  and if it's frozen, **auto-fall-back to VECTOR for all edges**. Never trust the endpoint-id
+  read-back alone, and never ship a frozen connector.
 
 All concrete recipes (capture+poll, one-page container, arrange math, the arrow `eval`,
 placeholders, auth, crawl) live in **`references/wireflow-build.md`** — follow it exactly.
 
 ## Inputs
 
-- **Screens to capture** (required): URLs / localhost routes, one per screen or state.
+- **Screens** (required) — **either** URLs / localhost routes to capture (one per screen/state),
+  **or** frames that **already exist in Figma** (a section/page link the user points at). The
+  latter is the **connect-only fast path** — see the Pipeline note below.
 - **Flow connections** (optional, combinable — see "Flow sources"): a user transition list, a
   FigJam/UCN, and/or a bounded crawl. None given → capture + arrange only, then ask before arrows.
 - **Target** (optional): an existing `/design/` file (extract `fileKey` from its URL), else create one.
+
+## Connect-only fast path (frames already in Figma)
+
+**If the screens already exist in Figma**, there is nothing to capture — **skip pipeline steps 1
+(engine/Playwright/permission check), 3 (auth), 4 (crawl), 5 (smoke capture), 6 (capture), and 7.**
+Run only: (a) confirm the flow graph + map each node to its **stable frame id**, (b) read all frame
+coords in one call, (c) batch-draw connectors (§4 magnetic with its verify-and-fallback gate, else
+§4b VECTOR), (d) verify once. This is ~2–4 `use_figma` calls and needs **no Playwright, no
+`browser_run_code_unsafe`, no capture**. Full recipe: `references/wireflow-build.md` §0b.
 
 ## Pipeline
 
@@ -122,9 +141,14 @@ When more than one is given, the explicit list / FigJam / UCN win; crawl only fi
 
 Fidelity is Figma's capture's responsibility. Check only coverage + wiring:
 
-- Every flow node produced a **completed** capture + a named frame; every edge connects the intended
-  frames (read-back per `references/wireflow-build.md` §4 — for a magnetic connector assert
-  `type === "CONNECTOR"` + endpoint ids; for a VECTOR assert endpoints + a non-`NONE` arrowhead).
+- Every flow node produced a **completed** capture + a named frame (on the connect-only fast path,
+  every frame already exists); every edge connects the intended frames (read-back per
+  `references/wireflow-build.md` §4 — for a magnetic connector assert `type === "CONNECTOR"`,
+  endpoint ids, **that the start vertex actually landed by *geometry*** (the endpoint-id read-back
+  lies when the start is frozen), **and arrow *direction*** (`connectorEndStrokeCap` is the arrow,
+  `connectorStartStrokeCap` is `"NONE"` — an inherited start-cap silently reverses the arrow); for a
+  VECTOR assert endpoints + a non-`NONE` arrowhead). A frozen-start **or** backward connector is
+  **not** a pass.
 - **Failed captures:** retry **once**; if still failing, drop a loud labeled **placeholder**
   (`⚠ Capture failed: <screen> — <reason>`) in its slot, still connect its edges, continue, and
   **list every failure at the end** for the user to retry (`references/wireflow-build.md` §1, §5).

@@ -5,6 +5,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the suite is versioned by the repo-root [`VERSION`](VERSION) file (see
 [CLAUDE.md → Distribution & versioning](CLAUDE.md)).
 
+## [1.16.0] - 2026-06-22
+
+### Added
+- **`page-to-figma` connect-only fast path — connect frames that already exist in Figma** (a
+  section/page the user points at) without capturing anything (`§0b`). When the screens are already
+  in the file, the run **skips the entire capture apparatus** — Playwright, the
+  `browser_run_code_unsafe` permission grant, `generate_figma_design`, auth (`§6`), and crawl
+  (`§7`) — collapsing to ~2–4 `use_figma` calls: confirm the flow graph → read all frame coords in
+  one call → batch-draw connectors → verify once. The skill description + Inputs now trigger on
+  "connect these Figma frames/this section as a wireflow."
+
+### Changed
+- **Magnetic connectors are now the primary *attempt* behind a mandatory verify-and-fallback gate**
+  (`§4`), not an unconditional primary. A production run proved that in some `/design/` files via
+  the `use_figma` plugin bridge, **re-pointing `connectorStart` is inert** — `connectorEnd` re-binds
+  live but the *start* vertex freezes at the donor's original location (reproduced across two
+  donors, node-magnet/free-position/position-offset forms, atomic `set`, clear-then-rebind,
+  line-type toggle, clone *and* original, page-level *and* section-nested, surviving a real frame
+  nudge), and the property read-back **falsely reads correct**. CONNECTOR nodes expose no
+  `vectorNetwork` to fix geometry by hand. The skill now **smoke-tests ONE edge, verifies the start
+  landed by *geometry* (not endpoint-id), and auto-falls-back to VECTOR for all edges** if it's
+  frozen. The completion gate rejects a frozen-start connector.
+- **`§4` now sets connector stroke caps explicitly for arrow direction.** A donor's arrowhead can
+  live on its *start* cap (`connectorStartStrokeCap`), which silently points every cloned arrow
+  **backward** even when endpoints are perfect. The recipe now sets `connectorStartStrokeCap = "NONE"`
+  + `connectorEndStrokeCap = <arrow>` per edge, and the verify gate + completion gate check direction
+  (caught live: a re-pasted donor connected correctly via magnetic, but pointed backward until the
+  caps were set). This also confirmed magnetic **does** work end-to-end via `use_figma` when the
+  donor's start re-points — the verify-and-fallback gate is what tells the two environments apart.
+- **`§4b` VECTOR fallback gained a proven `use_figma` recipe** (preferred over the `$FIGMA_CLI`
+  form): node-level `strokeCap = "ARROW_LINES"` **does** render arrowheads on straight *and*
+  multi-segment elbow paths (confirmed via `vectorNetwork` last-vertex read-back), plus a
+  **white-chip label** pattern (readable over dark canvas/frames) and straight-vs-drop edge geometry.
+
+### Notes
+- **Sections renumber and drop loose children.** A `SECTION`'s node id can change and it can drop
+  loosely-parented connectors when the user cut/pastes or re-sections it mid-run; contained frames
+  travel safely. The skill now references frames by **stable frame ids** and re-resolves the section
+  id before the final verify (`§0b` gotcha).
+
 ## [1.15.0] - 2026-06-22
 
 ### Changed
@@ -398,6 +438,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
+[1.16.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.15.0...main
 [1.15.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
 [1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
 [1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
