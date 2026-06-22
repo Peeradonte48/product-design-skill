@@ -438,7 +438,7 @@ See `docs/adr/0007-page-to-figma-capture-wireflow.md` (supersedes ADR 0006, upda
   repo-root `VERSION` file becomes the single version of record (stamped into a
   `~/.claude/skills/.product-design-skill.version` manifest at install time).
 
-[1.16.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.15.0...main
+[1.16.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
 [1.14.1]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
 [1.14.0]: https://github.com/Peeradonte48/product-design-skill/compare/v1.12.0...v1.15.0
